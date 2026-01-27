@@ -1,11 +1,25 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import TopNav from './components/TopNav.vue'
+</script>
 
 <template>
-  <h1>You did it!</h1>
-  <p>
-    Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
-    documentation
-  </p>
+  <div class="app">
+    <TopNav />
+    <RouterView />
+  </div>
 </template>
 
-<style scoped></style>
+<style>
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(900px 600px at 15% 0%, rgba(249, 115, 22, 0.14), transparent 60%),
+    radial-gradient(900px 600px at 85% 10%, rgba(249, 115, 22, 0.1), transparent 55%),
+    #f7f7fb;
+}
+</style>
