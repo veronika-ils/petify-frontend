@@ -21,7 +21,8 @@
           </li>
         </ul>
 
-        <form class="d-flex" role="search" @submit.prevent>
+        <div class="d-flex align-items-center gap-2">
+          <form class="d-flex" role="search" @submit.prevent>
           <input
             v-model="query"
             class="form-control search"
@@ -29,7 +30,20 @@
             placeholder="Search pets"
             aria-label="Search"
           />
-        </form>
+          </form>
+
+          <div class="d-flex gap-2">
+            <template v-if="auth.isAuthenticated">
+              <button class="btn btn-outline-secondary" type="button" @click="logout">
+                Log out
+              </button>
+            </template>
+            <template v-else>
+              <RouterLink class="btn btn-outline-secondary" to="/login">Log in</RouterLink>
+              <RouterLink class="btn btn-primary" to="/signup">Sign up</RouterLink>
+            </template>
+          </div>
+        </div>
       </div>
     </div>
   </nav>
@@ -38,9 +52,12 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+
+const auth = useAuthStore()
 
 const isOpen = ref(false)
 
@@ -57,6 +74,11 @@ const query = computed({
     router.replace({ query: { ...route.query, q: value || undefined } })
   },
 })
+
+function logout() {
+  auth.logout()
+  router.push('/')
+}
 </script>
 
 <style scoped>
