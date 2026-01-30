@@ -12,7 +12,16 @@ export interface SignupRequest {
 }
 
 export interface AuthResult {
-  token: string
+  token?: string
+  user?: {
+    userId: number
+    username: string
+    email: string
+    firstName: string
+    lastName: string
+    userType: string
+  }
+  message?: string
 }
 
 function getBaseUrl(): string {
@@ -76,21 +85,55 @@ async function postJson<T>(path: string, body: unknown, options?: { signal?: Abo
 }
 
 export async function login(payload: LoginRequest, options?: { signal?: AbortSignal }): Promise<AuthResult> {
-  const data = await postJson<unknown>('/api/auth/login', payload, options)
-  const token = extractToken(data)
-  if (!token) {
-    throw new Error('Login succeeded but no token was returned')
+  const data = await postJson<any>('/api/auth/login', payload, options)
+
+  // Check if there's an error message
+  if (data.message && data.message !== "Login successful") {
+    throw new Error(data.message)
   }
-  return { token }
+
+  // Extract user information from the response
+  if (data.userId && data.username) {
+    return {
+      user: {
+        userId: data.userId,
+        username: data.username,
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        userType: data.userType
+      },
+      message: data.message
+    }
+  }
+
+  // If we don't get user data, something went wrong
+  throw new Error('Login failed: Invalid response from server')
 }
 
 export async function signup(payload: SignupRequest, options?: { signal?: AbortSignal }): Promise<AuthResult> {
-  const data = await postJson<unknown>('/api/auth/signup', payload, options)
-  const token = extractToken(data)
-  if (!token) {
-    // Some APIs return 201 with no token; treat as success but unauthenticated.
-    // Caller can redirect to login.
-    return { token: '' }
+  const data = await postJson<any>('/api/auth/signup', payload, options)
+
+  // Check if there's an error message
+  if (data.message && data.message !== "User registered successfully") {
+    throw new Error(data.message)
   }
-  return { token }
+
+  // Extract user information from the response if successful
+  if (data.userId && data.username) {
+    return {
+      user: {
+        userId: data.userId,
+        username: data.username,
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        userType: data.userType
+      },
+      message: data.message
+    }
+  }
+
+  // If registration was successful but no user data returned, that's okay
+  return { message: data.message || "Registration successful" }
 }
