@@ -34,6 +34,9 @@
 
           <div class="d-flex gap-2">
             <template v-if="auth.isAuthenticated">
+              <RouterLink class="btn btn-outline-secondary" to="/profile">
+                {{ auth.user?.firstName }}'s Profile
+              </RouterLink>
               <button class="btn btn-outline-secondary" type="button" @click="logout">
                 Log out
               </button>
