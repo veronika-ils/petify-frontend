@@ -48,7 +48,7 @@
             <i class="bi bi-paw-fill"></i> My Pets
           </button>
         </li>
-        <li v-if="isOwner" class="nav-item" role="presentation">
+        <li v-if=" pets.length > 0" class="nav-item" role="presentation">
           <button
             class="nav-link"
             :class="{ active: activeTab === 'create-listing' }"
@@ -65,13 +65,13 @@
       <div v-if="activeTab === 'listings'" class="tab-pane active">
         <h2 class="mb-4">My Listings</h2>
         <div v-if="listings.length === 0" class="alert alert-info">
-          <p v-if="isOwner" class="mb-0">
+          <p  class="mb-0">
             You haven't created any listings yet.
             <a href="#" @click.prevent="activeTab = 'create-listing'">Create your first listing!</a>
           </p>
-          <p v-else class="mb-0">You don't have any listings.</p>
+
         </div>
-        <div v-else class="row g-4">
+        <div  class="row g-4">
           <div v-for="listing in listings" :key="listing.listingId" class="col-md-6 col-lg-4">
             <div class="card h-100 shadow-sm listing-card">
               <div class="card-body d-flex flex-column">
@@ -143,10 +143,18 @@
         </div>
       </div>
 
-      <!-- Create Listing Tab (Owner Only) -->
-      <div v-if="isOwner && activeTab === 'create-listing'" class="tab-pane active">
+      <!-- Create Listing Tab (Owner Only with Pets) -->
+      <div v-if="activeTab === 'create-listing'" class="tab-pane active">
         <h2 class="mb-4">Create New Listing</h2>
-        <div class="card shadow-sm">
+
+        <div v-if="pets.length === 0" class="alert alert-warning">
+          <p class="mb-0">
+            You need to have at least one pet to create a listing.
+            Go to the <a href="#" @click.prevent="activeTab = 'pets'">My Pets</a> tab to add your first pet.
+          </p>
+        </div>
+
+        <div v-else class="card shadow-sm">
           <div class="card-body">
             <form @submit.prevent="submitListing">
               <div class="mb-3">
@@ -296,7 +304,7 @@ async function loadPets() {
     pets.value = await getUserPets(auth.user.userId)
   } catch (error) {
     console.error('Failed to load pets:', error)
-    // Pets endpoint might not exist yet, so just show empty list
+    // If no pets exist, just show empty list
     pets.value = []
   } finally {
     isLoading.value = false
