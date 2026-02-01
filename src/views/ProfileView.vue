@@ -48,6 +48,17 @@
             <i class="bi bi-paw-fill"></i> My Pets
           </button>
         </li>
+        <li class="nav-item" role="presentation">
+          <button
+            class="nav-link"
+            :class="{ active: activeTab === 'favorites' }"
+            @click="activeTab = 'favorites'"
+            type="button"
+            role="tab"
+          >
+            <i class="bi bi-heart-fill"></i> Favorites
+          </button>
+        </li>
         <li v-if=" pets.length > 0" class="nav-item" role="presentation">
           <button
             class="nav-link"
@@ -223,6 +234,44 @@
           </div>
         </div>
       </div>
+
+      <!-- Favorites Tab -->
+      <div v-if="activeTab === 'favorites'" class="tab-pane active">
+        <h2 class="mb-4">Favorite Listings</h2>
+        <div v-if="favorites.length === 0" class="alert alert-info">
+          <p class="mb-0">You haven't added any favorites yet. Browse listings and click the heart icon to save them!</p>
+        </div>
+        <div v-else class="row g-4">
+          <div v-for="listing in favorites" :key="listing.listingId" class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm listing-card">
+              <div class="card-body d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <h5 class="card-title">Animal ID: {{ listing.animalId }}</h5>
+                  <button
+                    @click="removeFavorite(listing.listingId)"
+                    class="btn btn-sm btn-link text-danger p-0"
+                    title="Remove from favorites"
+                  >
+                    <i class="bi bi-heart-fill"></i>
+                  </button>
+                </div>
+                <p class="card-text text-muted">{{ listing.description }}</p>
+                <div class="mt-auto">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="badge" :class="getStatusBadgeClass(listing.status)">
+                      {{ listing.status }}
+                    </span>
+                    <strong class="text-primary">${{ listing.price }}</strong>
+                  </div>
+                  <small class="text-muted d-block">
+                    Created: {{ formatDate(listing.createdAt) }}
+                  </small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -238,13 +287,15 @@ import {
   deleteListing,
   updateListingStatus,
 } from '../api/profile'
+import { getFavoritedListings, removeFavorite as removeFavoriteAPI } from '../api/favorites'
 
 const router = useRouter()
 const auth = useAuthStore()
 
-const activeTab = ref<'listings' | 'pets' | 'create-listing'>('listings')
+const activeTab = ref<'listings' | 'pets' | 'create-listing' | 'favorites'>('listings')
 const listings = ref<any[]>([])
 const pets = ref<any[]>([])
+const favorites = ref<any[]>([])
 const isLoading = ref(false)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
@@ -376,6 +427,30 @@ function resetForm() {
   errorMessage.value = ''
 }
 
+async function loadFavorites() {
+  if (!auth.user?.userId) return
+  try {
+    isLoading.value = true
+    favorites.value = await getFavoritedListings(auth.user.userId)
+  } catch (error) {
+    console.error('Failed to load favorites:', error)
+    favorites.value = []
+  } finally {
+    isLoading.value = false
+  }
+}
+
+async function removeFavorite(listingId: number) {
+  if (!auth.user?.userId) return
+
+  try {
+    await removeFavoriteAPI(auth.user.userId, listingId)
+    await loadFavorites()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Failed to remove favorite'
+  }
+}
+
 onMounted(() => {
   if (!auth.isAuthenticated) {
     router.push('/login')
@@ -384,6 +459,7 @@ onMounted(() => {
 
   loadListings()
   loadPets()
+  loadFavorites()
 })
 </script>
 

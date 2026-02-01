@@ -42,8 +42,10 @@
         v-for="listing in filteredListings"
         :key="listing.id"
         :listing="listing"
+        :favorited="listing.favorited"
         @click="goToDetails(listing.id)"
         @view="goToDetails(listing.id)"
+        @favorite="handleFavorite"
       />
     </section>
   </main>
@@ -56,13 +58,17 @@ import ListingCard from '../components/ListingCard.vue'
 import type { Listing } from '../types/listing'
 import { fetchListings } from '../api/listings'
 import { mockListings } from '../data/mockListings'
+import { useAuthStore } from '../stores/auth'
+import { addFavorite, removeFavorite, getFavoritedListings } from '../api/favorites'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
 const loading = ref(false)
 const error = ref<string | null>(null)
 const listings = ref<Listing[]>([])
+const favoritedListingIds = ref<Set<number>>(new Set())
 
 const petType = ref('')
 
@@ -84,6 +90,10 @@ const filteredListings = computed(() => {
         .toLowerCase()
       return haystack.includes(q)
     })
+    .map((l) => ({
+      ...l,
+      favorited: favoritedListingIds.value.has(l.id || l.listingId || 0),
+    }))
 })
 
 let abort: AbortController | null = null
@@ -105,6 +115,31 @@ async function load() {
   } finally {
     loading.value = false
   }
+
+  // Load user favorites if authenticated
+  if (auth.isAuthenticated && auth.user?.userId) {
+    await loadUserFavorites()
+  } else {
+    // Clear favorites if user is not authenticated
+    favoritedListingIds.value.clear()
+  }
+}
+
+async function loadUserFavorites() {
+  try {
+    if (!auth.isAuthenticated || !auth.user?.userId) {
+      favoritedListingIds.value.clear()
+      return
+    }
+    const favorites = await getFavoritedListings(auth.user.userId)
+    favoritedListingIds.value = new Set(
+      favorites.map((f) => f.id || f.listingId || 0).filter((id) => id > 0)
+    )
+    console.log('Loaded favorites:', Array.from(favoritedListingIds.value))
+  } catch (error) {
+    console.error('Failed to load favorites:', error)
+    favoritedListingIds.value.clear()
+  }
 }
 
 function reload() {
@@ -113,6 +148,30 @@ function reload() {
 
 function goToDetails(id: string) {
   router.push({ name: 'listing-details', params: { id } })
+}
+
+async function handleFavorite(event: { listing: Listing; favorited: boolean }) {
+  if (!auth.isAuthenticated || !auth.user?.userId) {
+    alert('Please log in to save favorites')
+    return
+  }
+
+  try {
+    const listingId = Number(event.listing.id || event.listing.listingId)
+
+    if (event.favorited) {
+      await addFavorite(auth.user.userId, listingId)
+      // Add to local set to show filled heart immediately
+      favoritedListingIds.value.add(listingId)
+    } else {
+      await removeFavorite(auth.user.userId, listingId)
+      // Remove from local set to show empty heart immediately
+      favoritedListingIds.value.delete(listingId)
+    }
+  } catch (error) {
+    console.error('Failed to update favorite:', error)
+    alert('Failed to update favorite. Please try again.')
+  }
 }
 
 onMounted(load)
