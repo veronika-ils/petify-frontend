@@ -92,7 +92,7 @@ const filteredListings = computed(() => {
     })
     .map((l) => ({
       ...l,
-      favorited: favoritedListingIds.value.has(l.id || l.listingId || 0),
+      favorited: favoritedListingIds.value.has(Number(l.listingId )),
     }))
 })
 
@@ -112,17 +112,15 @@ async function load() {
     const message = e instanceof Error ? e.message : String(e)
     error.value = message
     listings.value = mockListings
-  } finally {
-    loading.value = false
   }
 
-  // Load user favorites if authenticated
   if (auth.isAuthenticated && auth.user?.userId) {
     await loadUserFavorites()
   } else {
-    // Clear favorites if user is not authenticated
     favoritedListingIds.value.clear()
   }
+
+  loading.value = false
 }
 
 async function loadUserFavorites() {
@@ -133,8 +131,11 @@ async function loadUserFavorites() {
     }
     const favorites = await getFavoritedListings(auth.user.userId)
     favoritedListingIds.value = new Set(
-      favorites.map((f) => f.id || f.listingId || 0).filter((id) => id > 0)
+      favorites
+        .map((f) => Number(f.listingId))
+        .filter((id) => Number.isFinite(id) && id > 0)
     )
+
     console.log('Loaded favorites:', Array.from(favoritedListingIds.value))
   } catch (error) {
     console.error('Failed to load favorites:', error)
