@@ -51,6 +51,17 @@
         <li class="nav-item" role="presentation">
           <button
             class="nav-link"
+            :class="{ active: activeTab === 'add-pet' }"
+            @click="activeTab = 'add-pet'"
+            type="button"
+            role="tab"
+          >
+            <i class="bi bi-plus-circle-fill"></i> Add Pet
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button
+            class="nav-link"
             :class="{ active: activeTab === 'favorites' }"
             @click="activeTab = 'favorites'"
             type="button"
@@ -134,12 +145,12 @@
               <div class="card-body">
                 <h5 class="card-title">{{ pet.name }}</h5>
                 <p class="card-text">
+                  <strong>Type:</strong> {{ pet.type }}<br>
                   <strong>Species:</strong> {{ pet.species }}<br>
                   <span v-if="pet.breed"><strong>Breed:</strong> {{ pet.breed }}<br></span>
-                  <span v-if="pet.age"><strong>Age:</strong> {{ pet.age }} years<br></span>
-                </p>
-                <p v-if="pet.description" class="card-text text-muted small">
-                  {{ pet.description }}
+                  <span v-if="pet.sex"><strong>Sex:</strong> {{ pet.sex }}<br></span>
+                  <span v-if="pet.dateOfBirth"><strong>DOB:</strong> {{ formatDate(pet.dateOfBirth) }}<br></span>
+                  <span v-if="pet.locatedName"><strong>Location:</strong> {{ pet.locatedName }}<br></span>
                 </p>
                 <button
                   v-if="isOwner"
@@ -235,6 +246,136 @@
         </div>
       </div>
 
+      <!-- Add Pet Tab -->
+      <div v-if="activeTab === 'add-pet'" class="tab-pane active">
+        <h2 class="mb-4">Add New Pet</h2>
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <form @submit.prevent="submitPet">
+              <div class="mb-3">
+                <label for="petName" class="form-label">Pet Name <span class="text-danger">*</span></label>
+                <input
+                  v-model="newPet.name"
+                  type="text"
+                  id="petName"
+                  class="form-control"
+                  placeholder="e.g., Buddy"
+                  required
+                />
+              </div>
+
+              <div class="mb-3">
+                <label for="petSex" class="form-label">Sex <span class="text-danger">*</span></label>
+                <select
+                  v-model="newPet.sex"
+                  id="petSex"
+                  class="form-select"
+                  required
+                >
+                  <option value="">Select sex...</option>
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                  <option value="UNKNOWN">Unknown</option>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label for="petType" class="form-label">Type <span class="text-danger">*</span></label>
+                <input
+                  v-model="newPet.type"
+                  type="text"
+                  id="petType"
+                  class="form-control"
+                  placeholder="e.g., PET"
+                  required
+                />
+              </div>
+
+              <div class="mb-3">
+                <label for="petSpecies" class="form-label">Species <span class="text-danger">*</span></label>
+                <select
+                  v-model="newPet.species"
+                  id="petSpecies"
+                  class="form-select"
+                  required
+                >
+                  <option value="">Select a species...</option>
+                  <option value="Dog">Dog</option>
+                  <option value="Cat">Cat</option>
+                  <option value="Bird">Bird</option>
+                  <option value="Rabbit">Rabbit</option>
+                  <option value="Hamster">Hamster</option>
+                  <option value="Guinea Pig">Guinea Pig</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label for="petBreed" class="form-label">Breed</label>
+                <input
+                  v-model="newPet.breed"
+                  type="text"
+                  id="petBreed"
+                  class="form-control"
+                  placeholder="e.g., Golden Retriever"
+                />
+              </div>
+
+              <div class="mb-3">
+                <label for="petDateOfBirth" class="form-label">Date of Birth</label>
+                <input
+                  v-model="newPet.dateOfBirth"
+                  type="date"
+                  id="petDateOfBirth"
+                  class="form-control"
+                />
+              </div>
+
+              <div class="mb-3">
+                <label for="petPhotoUrl" class="form-label">Photo URL</label>
+                <input
+                  v-model="newPet.photoUrl"
+                  type="url"
+                  id="petPhotoUrl"
+                  class="form-control"
+                  placeholder="https://example.com/photo.jpg"
+                />
+              </div>
+
+              <div class="mb-3">
+                <label for="petLocatedName" class="form-label">Location</label>
+                <input
+                  v-model="newPet.locatedName"
+                  type="text"
+                  id="petLocatedName"
+                  class="form-control"
+                  placeholder="e.g., Skopje"
+                />
+              </div>
+
+              <div v-if="errorMessage" class="alert alert-danger">
+                {{ errorMessage }}
+              </div>
+
+              <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary" :disabled="isPetSubmitting">
+                  <span v-if="isPetSubmitting" class="spinner-border spinner-border-sm me-2"></span>
+                  {{ isPetSubmitting ? 'Adding Pet...' : 'Add Pet' }}
+                </button>
+                <button
+                  type="button"
+                  @click="resetPetForm"
+                  class="btn btn-secondary"
+                  :disabled="isPetSubmitting"
+                >
+                  Reset
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
       <!-- Favorites Tab -->
       <div v-if="activeTab === 'favorites'" class="tab-pane active">
         <h2 class="mb-4">Favorite Listings</h2>
@@ -284,6 +425,7 @@ import {
   getUserListings,
   getUserPets,
   createListing,
+  createPet,
   deleteListing,
   updateListingStatus,
 } from '../api/profile'
@@ -292,18 +434,30 @@ import { getFavoritedListings, removeFavorite as removeFavoriteAPI } from '../ap
 const router = useRouter()
 const auth = useAuthStore()
 
-const activeTab = ref<'listings' | 'pets' | 'create-listing' | 'favorites'>('listings')
+const activeTab = ref<'listings' | 'pets' | 'add-pet' | 'create-listing' | 'favorites'>('listings')
 const listings = ref<any[]>([])
 const pets = ref<any[]>([])
 const favorites = ref<any[]>([])
 const isLoading = ref(false)
 const isSubmitting = ref(false)
+const isPetSubmitting = ref(false)
 const errorMessage = ref('')
 
 const newListing = ref({
   animalId: null as number | null,
   description: '',
   price: null as number | null,
+})
+
+const newPet = ref({
+  name: '',
+  sex: '',
+  dateOfBirth: '',
+  photoUrl: '',
+  type: 'PET',
+  species: '',
+  breed: '',
+  locatedName: '',
 })
 
 const isOwner = computed(() => {
@@ -423,6 +577,57 @@ function resetForm() {
     animalId: null,
     description: '',
     price: null,
+  }
+  errorMessage.value = ''
+}
+
+async function submitPet() {
+  if (!auth.user?.userId || !newPet.value.name || !newPet.value.sex || !newPet.value.type || !newPet.value.species) {
+    errorMessage.value = 'Please fill in pet name, sex, type, and species'
+    return
+  }
+
+  try {
+    isPetSubmitting.value = true
+    errorMessage.value = ''
+
+    const petPayload = {
+      name: newPet.value.name,
+      sex: newPet.value.sex,
+      dateOfBirth: newPet.value.dateOfBirth || undefined,
+      photoUrl: newPet.value.photoUrl || undefined,
+      type: newPet.value.type,
+      species: newPet.value.species,
+      breed: newPet.value.breed || undefined,
+      locatedName: newPet.value.locatedName || undefined,
+    }
+
+    console.log('📤 Sending pet payload:', petPayload)
+    console.log('User ID:', auth.user.userId)
+
+    await createPet(auth.user.userId, petPayload)
+
+    // Reload pets and promote user to owner if needed
+    await loadPets()
+    resetPetForm()
+    activeTab.value = 'pets'
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Failed to add pet'
+  } finally {
+    isPetSubmitting.value = false
+  }
+}
+
+function resetPetForm() {
+  newPet.value = {
+    name: '',
+    sex: '',
+    dateOfBirth: '',
+    photoUrl: '',
+    type: 'PET',
+    species: '',
+    breed: '',
+    locatedName: '',
   }
   errorMessage.value = ''
 }

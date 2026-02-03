@@ -19,10 +19,13 @@ export interface UserProfile {
 export interface Pet {
   animalId: number
   name: string
+  sex: string
+  dateOfBirth?: string
+  photoUrl?: string
+  type: string
   species: string
   breed?: string
-  age?: number
-  description?: string
+  locatedName?: string
 }
 
 export async function getUserListings(userId: number): Promise<any[]> {
@@ -57,6 +60,51 @@ export async function getUserPets(userId: number): Promise<Pet[]> {
   }
 
   return await response.json()
+}
+
+export async function createPet(
+  userId: number,
+  data: {
+    name: string
+    sex: string
+    dateOfBirth?: string
+    photoUrl?: string
+    type: string
+    species: string
+    breed?: string
+    locatedName?: string
+  }
+): Promise<Pet> {
+  const url = joinUrl(getBaseUrl(), `/api/users/${userId}/pets`)
+
+  console.log('🔗 API URL:', url)
+  console.log('📦 Request payload:', data)
+  console.log('📋 Headers:', {
+    'Content-Type': 'application/json',
+    'X-User-Id': String(userId),
+  })
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': String(userId),
+    },
+    body: JSON.stringify(data),
+  })
+
+  console.log('📬 Response status:', response.status)
+  console.log('📬 Response headers:', response.headers)
+
+  if (!response.ok) {
+    const error = await response.json()
+    console.error('❌ Error response:', error)
+    throw new Error(error.error || `Failed to create pet: ${response.statusText}`)
+  }
+
+  const result = await response.json()
+  console.log('✅ Pet created successfully:', result)
+  return result
 }
 
 export async function createListing(
