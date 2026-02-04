@@ -106,3 +106,75 @@ export async function fetchListings(options?: { signal?: AbortSignal }): Promise
 
   return data.map(normalizeListingRow).filter((x): x is Listing => x !== null)
 }
+
+export async function fetchListingById(listingId: string | number, options?: { signal?: AbortSignal }): Promise<Listing> {
+  const url = joinUrl(getBaseUrl(), `/api/listings/${listingId}`)
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    signal: options?.signal,
+  })
+
+  if (!res.ok) {
+    throw new Error(`Failed to load listing (${res.status})`)
+  }
+
+  const data = (await res.json()) as unknown
+  const listing = normalizeListingRow(data)
+  if (!listing) throw new Error('Invalid listing data')
+  return listing
+}
+
+export async function fetchUserName(userId: number, options?: { signal?: AbortSignal }): Promise<string | null> {
+  try {
+    const url = joinUrl(getBaseUrl(), `/api/users/${userId}`)
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: options?.signal,
+    })
+
+    if (!res.ok) return null
+
+    const data = (await res.json()) as unknown
+    if (typeof data === 'object' && data !== null) {
+      const user = data as Record<string, unknown>
+      const firstName = user.firstName ? String(user.firstName) : ''
+      const lastName = user.lastName ? String(user.lastName) : ''
+      if (firstName || lastName) {
+        return `${firstName} ${lastName}`.trim()
+      }
+      if (user.username) {
+        return String(user.username)
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+export async function fetchPetName(petId: number, options?: { signal?: AbortSignal }): Promise<string | null> {
+  try {
+    const url = joinUrl(getBaseUrl(), `/api/pets/${petId}`)
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: options?.signal,
+    })
+
+    if (!res.ok) return null
+
+    const data = (await res.json()) as unknown
+    if (typeof data === 'object' && data !== null) {
+      const pet = data as Record<string, unknown>
+      if (pet.name) {
+        return String(pet.name)
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+

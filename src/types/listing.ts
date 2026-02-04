@@ -29,6 +29,10 @@ export interface Listing {
   imageUrl?: string
   tags?: string[]
 
+  // Owner and animal info
+  ownerName?: string
+  animalName?: string
+
   // Backwards/alternate fields supported by `ListingCard`
   name?: string
   photos?: string[]
