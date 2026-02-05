@@ -17,7 +17,9 @@
       <div class="alert alert-danger" role="alert">
         <div class="fw-semibold">Failed to load owner profile</div>
         <div class="small">{{ error }}</div>
-        <button class="btn btn-sm btn-outline-danger mt-2" type="button" @click="reload">Try again</button>
+        <button class="btn btn-sm btn-outline-danger mt-2" type="button" @click="reload">
+          Try again
+        </button>
       </div>
     </div>
 
@@ -62,6 +64,12 @@
               >
                 🐾 Pets ({{ ownerPets.length }})
               </button>
+              <button
+                :class="['tab-button', { active: activeTab === 'reviews' }]"
+                @click="activeTab = 'reviews'"
+              >
+                ⭐ Reviews ({{ ownerReviews.length }})
+              </button>
             </div>
 
             <!-- Listings Tab -->
@@ -76,14 +84,16 @@
                 <div v-for="listing in ownerListings" :key="listing.listingId" class="listing-item">
                   <RouterLink :to="`/listing/${listing.listingId}`" class="listing-link">
                     <div class="listing-card">
-                      <div class="listing-status" :class="`status-${listing.status?.toLowerCase()}`">
+                      <div class="listing-status" :class="statusClass(listing.status)">
                         {{ listing.status || 'Active' }}
                       </div>
+
                       <h3 class="listing-title">Animal #{{ listing.animalId }}</h3>
                       <p class="listing-description">{{ listing.description }}</p>
+
                       <div class="listing-footer">
-                        <span class="listing-price" v-if="listing.price">
-                          ${{ listing.price.toFixed(2) }}
+                        <span class="listing-price" v-if="hasPrice(listing.price)">
+                          ${{ formatPrice(listing.price) }}
                         </span>
                         <span class="listing-date">
                           {{ formatDate(listing.createdAt) }}
@@ -135,6 +145,93 @@
                 </div>
               </div>
             </div>
+
+            <!-- Reviews Tab -->
+            <div v-if="activeTab === 'reviews'" class="tab-content">
+              <h2 class="section-title">Reviews ({{ ownerReviews.length }})</h2>
+
+              <!-- Add Review Form (only if logged in and not own profile) -->
+              <div
+                v-if="auth.isAuthenticated && ownerInfo && auth.user?.userId !== ownerInfo.userId"
+                class="add-review-card"
+              >
+                <h3 class="add-review-title">Leave a Review</h3>
+                <form @submit.prevent="submitReview">
+                  <div class="form-group">
+                    <label class="label">Rating</label>
+                    <div class="rating-input">
+                      <button
+                        v-for="i in 5"
+                        :key="i"
+                        type="button"
+                        :class="['star-btn', { active: newReview.rating === i }]"
+                        @click="newReview.rating = i"
+                      >
+                        {{ i <= newReview.rating ? '⭐' : '☆' }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="label" for="comment">Comment</label>
+                    <textarea
+                      id="comment"
+                      v-model="newReview.comment"
+                      class="form-control"
+                      placeholder="Share your experience with this owner..."
+                      rows="4"
+                    ></textarea>
+                  </div>
+
+                  <div v-if="reviewError" class="alert alert-danger" role="alert">
+                    {{ reviewError }}
+                  </div>
+
+                  <div class="form-actions">
+                    <button
+                      type="submit"
+                      class="btn btn-primary"
+                      :disabled="isSubmittingReview || newReview.rating === 0"
+                    >
+                      <span v-if="isSubmittingReview">Submitting...</span>
+                      <span v-else>Submit Review</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Reviews List -->
+              <div v-if="ownerReviews.length === 0" class="empty-state">
+                <p>No reviews yet. Be the first to leave a review!</p>
+              </div>
+
+              <div v-else class="reviews-list">
+                <div v-for="review in ownerReviews" :key="review.reviewId" class="review-card">
+                  <div class="review-header">
+                    <div class="reviewer-info">
+                      <h4 class="reviewer-name">{{ review.reviewerName }}</h4>
+                      <p class="reviewer-username">@{{ review.reviewerUsername }}</p>
+                    </div>
+                    <div class="review-actions">
+                      <span class="rating">{{ '⭐'.repeat(Number(review.rating || 0)) }}</span>
+                      <button
+                        v-if="
+                          auth.isAuthenticated &&
+                          (auth.user?.userId === review.reviewerId || auth.user?.userId === ownerInfo?.userId)
+                        "
+                        type="button"
+                        class="delete-btn"
+                        @click="deleteReview(review.reviewId)"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                  <p class="review-comment">{{ review.comment }}</p>
+                  <p class="review-date">{{ formatDate(review.createdAt) }}</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -143,52 +240,70 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { useRoute, useRouter, RouterLink } from 'vue-router'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRoute, RouterLink } from 'vue-router'
 import { getUserProfile, getUserListings, getUserPets } from '../api/profile'
+import { createOrUpdateReview, getReviewsByOwner, deleteReview as deleteReviewAPI } from '../api/reviews'
+import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
-const router = useRouter()
+const auth = useAuthStore()
 
 const isLoading = ref(false)
 const error = ref<string | null>(null)
-const activeTab = ref<'listings' | 'pets'>('listings')
+
+const activeTab = ref<'listings' | 'pets' | 'reviews'>('listings')
+
 const ownerInfo = ref<any>(null)
 const ownerListings = ref<any[]>([])
 const ownerPets = ref<any[]>([])
+const ownerReviews = ref<any[]>([])
+
+const isSubmittingReview = ref(false)
+const reviewError = ref<string | null>(null)
+const newReview = ref({
+  rating: 0,
+  comment: '',
+})
 
 let abort: AbortController | null = null
 
-const userId = ref<number | null>(null)
+function extractArray(res: any): any[] {
+  if (Array.isArray(res)) return res
+  if (res?.content && Array.isArray(res.content)) return res.content
+  if (res?.data && Array.isArray(res.data)) return res.data
+  return []
+}
 
 async function load() {
   isLoading.value = true
   error.value = null
+
   ownerInfo.value = null
   ownerListings.value = []
   ownerPets.value = []
+  ownerReviews.value = []
 
   abort?.abort()
   abort = new AbortController()
 
   try {
     const id = Number(route.params.ownerId)
-    if (isNaN(id)) {
-      throw new Error('Invalid owner ID')
-    }
+    if (Number.isNaN(id)) throw new Error('Invalid owner ID')
 
-    userId.value = id
-
-    // Fetch owner info, listings, and pets in parallel
-    const [userInfo, listings, pets] = await Promise.all([
+    // NOTE: AbortController is kept to cancel UI state updates on route change;
+    // if your API layer supports fetch signals, pass abort.signal inside those functions.
+    const [userInfo, listingsRes, petsRes, reviewsRes] = await Promise.all([
       getUserProfile(id),
       getUserListings(id),
       getUserPets(id),
+      getReviewsByOwner(id),
     ])
 
     ownerInfo.value = userInfo
-    ownerListings.value = listings || []
-    ownerPets.value = pets || []
+    ownerListings.value = extractArray(listingsRes)
+    ownerPets.value = extractArray(petsRes)
+    ownerReviews.value = extractArray(reviewsRes)
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     error.value = message
@@ -202,6 +317,14 @@ function reload() {
   load()
 }
 
+watch(
+  () => route.params.ownerId,
+  () => {
+    // if user opens a different owner profile without leaving the page
+    load()
+  }
+)
+
 function onPetImageError(event: Event) {
   const img = event.target as HTMLImageElement
   img.style.display = 'none'
@@ -211,6 +334,7 @@ function formatDate(dateString: string): string {
   if (!dateString) return ''
   try {
     const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) return ''
     return new Intl.DateTimeFormat(undefined, {
       month: 'short',
       day: 'numeric',
@@ -221,12 +345,86 @@ function formatDate(dateString: string): string {
   }
 }
 
+function hasPrice(price: unknown): boolean {
+  const n = typeof price === 'number' ? price : Number(price)
+  return Number.isFinite(n) && n > 0
+}
+
+function formatPrice(price: unknown): string {
+  const n = typeof price === 'number' ? price : Number(price)
+  if (!Number.isFinite(n)) return ''
+  return n.toFixed(2)
+}
+
+function statusClass(status: unknown): string {
+  const s = String(status ?? 'active').toLowerCase()
+  return `status-${s}`
+}
+
 function contactOwner() {
   if (!ownerInfo.value?.email) {
     alert('Owner email not available')
     return
   }
   window.location.href = `mailto:${ownerInfo.value.email}`
+}
+
+async function submitReview() {
+  if (!auth.isAuthenticated || !auth.user?.userId) {
+    alert('Please log in to submit a review')
+    return
+  }
+
+  if (newReview.value.rating === 0) {
+    reviewError.value = 'Please select a rating'
+    return
+  }
+
+  isSubmittingReview.value = true
+  reviewError.value = null
+
+  try {
+    await createOrUpdateReview(
+      ownerInfo.value.userId,
+      auth.user.userId,
+      newReview.value.rating,
+      newReview.value.comment
+    )
+
+    newReview.value.rating = 0
+    newReview.value.comment = ''
+    await loadReviews()
+  } catch (err) {
+    reviewError.value = err instanceof Error ? err.message : 'Failed to submit review'
+  } finally {
+    isSubmittingReview.value = false
+  }
+}
+
+async function loadReviews() {
+  if (!ownerInfo.value?.userId) return
+  try {
+    const res = await getReviewsByOwner(ownerInfo.value.userId)
+    ownerReviews.value = extractArray(res)
+  } catch (err) {
+    console.error('Failed to load reviews:', err)
+  }
+}
+
+async function deleteReview(reviewId: number) {
+  if (!auth.isAuthenticated || !auth.user?.userId) {
+    alert('Please log in to delete a review')
+    return
+  }
+
+  if (confirm('Are you sure you want to delete this review?')) {
+    try {
+      await deleteReviewAPI(reviewId, auth.user.userId)
+      await loadReviews()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete review')
+    }
+  }
 }
 
 onMounted(load)
@@ -588,6 +786,204 @@ onBeforeUnmount(() => abort?.abort())
 
 .pet-details .value {
   color: #111827;
+}
+
+/* Reviews Section */
+.add-review-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.add-review-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 20px 0;
+  color: #111827;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.label {
+  display: block;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+}
+
+.rating-input {
+  display: flex;
+  gap: 8px;
+}
+
+.star-btn {
+  background: none;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.star-btn:hover {
+  border-color: #d97706;
+  background: #fef3c7;
+}
+
+.star-btn.active {
+  border-color: #d97706;
+  background: #fef3c7;
+}
+
+.form-control {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: #111827;
+  resize: vertical;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #d97706;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+}
+
+.btn-primary {
+  background: #d97706;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #b45309;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.alert-danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.review-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.2s ease;
+}
+
+.review-card:hover {
+  border-color: #d97706;
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.1);
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.reviewer-info {
+  flex: 1;
+}
+
+.reviewer-name {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+  color: #111827;
+}
+
+.reviewer-username {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.review-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rating {
+  font-size: 1rem;
+  color: #f59e0b;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+  padding: 4px 8px;
+}
+
+.delete-btn:hover {
+  opacity: 1;
+}
+
+.review-comment {
+  color: #374151;
+  line-height: 1.6;
+  margin: 0 0 12px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.review-date {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  margin: 0;
 }
 
 /* Responsive */
