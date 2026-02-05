@@ -307,7 +307,11 @@ async function toggleFavorite() {
 }
 
 function contactOwner() {
-  alert('Contact feature coming soon!')
+  if (!listing.value?.ownerId) {
+    alert('Owner information not available')
+    return
+  }
+  router.push({ name: 'owner-profile', params: { ownerId: listing.value.ownerId } })
 }
 
 function copyLink() {

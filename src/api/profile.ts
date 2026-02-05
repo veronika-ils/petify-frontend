@@ -28,6 +28,22 @@ export interface Pet {
   locatedName?: string
 }
 
+export async function getUserProfile(userId: number): Promise<UserProfile> {
+  const url = joinUrl(getBaseUrl(), `/api/users/${userId}`)
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch user profile: ${response.statusText}`)
+  }
+
+  return await response.json()
+}
+
 export async function getUserListings(userId: number): Promise<any[]> {
   const url = joinUrl(getBaseUrl(), `/api/listings/my-listings`)
   const response = await fetch(url, {
