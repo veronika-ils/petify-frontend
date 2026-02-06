@@ -18,13 +18,13 @@ export interface Review {
   createdAt: string
 }
 
-export async function createOrUpdateReview(
-  ownerId: number,
+export async function createReview(
+  targetUserId: number,
   userId: number,
   rating: number,
   comment: string
 ): Promise<Review> {
-  const url = joinUrl(getBaseUrl(), `/api/reviews/${ownerId}`)
+  const url = joinUrl(getBaseUrl(), `/api/reviews/${targetUserId}`)
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -39,14 +39,14 @@ export async function createOrUpdateReview(
 
   if (!response.ok) {
     const error = await response.json()
-    throw new Error(error.error || 'Failed to save review')
+    throw new Error(error.error || 'Failed to create review')
   }
 
   return await response.json()
 }
 
-export async function getReviewsByOwner(ownerId: number): Promise<Review[]> {
-  const url = joinUrl(getBaseUrl(), `/api/reviews/${ownerId}`)
+export async function getReviewsByOwner(targetUserId: number): Promise<Review[]> {
+  const url = joinUrl(getBaseUrl(), `/api/reviews/${targetUserId}`)
   const response = await fetch(url, {
     method: 'GET',
     headers: {

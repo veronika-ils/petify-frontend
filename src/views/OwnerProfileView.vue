@@ -243,7 +243,7 @@
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { getUserProfile, getUserListings, getUserPets } from '../api/profile'
-import { createOrUpdateReview, getReviewsByOwner, deleteReview as deleteReviewAPI } from '../api/reviews'
+import { createReview, getReviewsByOwner, deleteReview as deleteReviewAPI } from '../api/reviews'
 import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
@@ -384,13 +384,14 @@ async function submitReview() {
   reviewError.value = null
 
   try {
-    await createOrUpdateReview(
+    await createReview(
       ownerInfo.value.userId,
       auth.user.userId,
       newReview.value.rating,
       newReview.value.comment
     )
 
+    // Reset form and reload reviews
     newReview.value.rating = 0
     newReview.value.comment = ''
     await loadReviews()
