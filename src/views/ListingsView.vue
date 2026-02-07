@@ -143,7 +143,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import ListingCard from '../components/ListingCard.vue'
 import type { Listing } from '../types/listing'
@@ -181,6 +181,9 @@ const petTypes = [
   { value: 'Other', label: 'Other', icon: new URL('../img/bird_outline.png', import.meta.url).href, type: 'image' },
 ]
 
+// Store pet details cache to avoid repeated API calls
+const petDetailsCache = ref<Map<number, any>>(new Map())
+
 const breedOptions = computed(() => {
   const set = new Set<string>()
   for (const l of listings.value) {
@@ -192,8 +195,13 @@ const breedOptions = computed(() => {
         continue
       }
     }
-    const b = (l.breed || '').trim()
-    if (b) set.add(b)
+
+    // Get breed from cached pet details
+    if (l.animalId && petDetailsCache.value.has(l.animalId)) {
+      const petDetail = petDetailsCache.value.get(l.animalId)
+      const b = (petDetail?.breed || '').trim()
+      if (b) set.add(b)
+    }
   }
   return Array.from(set).sort((a, b) => a.localeCompare(b))
 })
@@ -201,8 +209,12 @@ const breedOptions = computed(() => {
 const cityOptions = computed(() => {
   const set = new Set<string>()
   for (const l of listings.value) {
-    const c = (l.city || '').trim()
-    if (c) set.add(c)
+    // Get location from cached pet details
+    if (l.animalId && petDetailsCache.value.has(l.animalId)) {
+      const petDetail = petDetailsCache.value.get(l.animalId)
+      const c = (petDetail?.locatedName || '').trim().toLowerCase()
+      if (c) set.add(c)
+    }
   }
   return Array.from(set).sort((a, b) => a.localeCompare(b))
 })
@@ -212,20 +224,36 @@ const hasGeoListings = computed(() => listings.value.some((l) => !!getListingCoo
 const filteredListings = computed(() => {
   return listings.value
     .filter((l) => {
+      // Pet type filter
       if (!petType.value) return true
       if (petType.value === 'Other') return l.petType && !['Dog', 'Cat'].includes(l.petType)
       return (l.petType || '') === petType.value
     })
     .filter((l) => {
-      if (!selectedBreed.value) return true
-      return (l.breed || '').trim() === selectedBreed.value
+      // Breed filter - if no breed is selected, show all
+      if (!selectedBreed.value || selectedBreed.value === '') return true
+
+      // Get breed from pet details cache
+      if (l.animalId && petDetailsCache.value.has(l.animalId)) {
+        const petDetail = petDetailsCache.value.get(l.animalId)
+        return (petDetail?.breed || '').trim() === selectedBreed.value
+      }
+      return false
     })
     .filter((l) => {
+      // City filter
       if (useNearMe.value) return true
-      if (!selectedCity.value) return true
-      return (l.city || '').trim() === selectedCity.value
+      if (!selectedCity.value || selectedCity.value === '') return true
+
+      // Get location from pet details cache and compare in lowercase
+      if (l.animalId && petDetailsCache.value.has(l.animalId)) {
+        const petDetail = petDetailsCache.value.get(l.animalId)
+        return (petDetail?.locatedName || '').trim().toLowerCase() === selectedCity.value.toLowerCase()
+      }
+      return false
     })
     .filter((l) => {
+      // Geolocation filter
       if (!useNearMe.value) return true
       if (!geoCoords.value) return true // waiting for permission
       const coords = getListingCoords(l)
@@ -289,12 +317,14 @@ async function load() {
   try {
     const data = await fetchListings({ signal: abort.signal })
 
-    // Fetch pet images for each listing
+    // Fetch pet images and details for each listing
     const listingsWithImages = await Promise.all(
       data.map(async (listing) => {
         try {
           if (listing.animalId) {
             const pet = await getPet(listing.animalId)
+            // Cache pet details for breed options
+            petDetailsCache.value.set(listing.animalId, pet)
             return {
               ...listing,
               imageUrl: pet.photoUrl || new URL('../img/all_outline.png', import.meta.url).href,
@@ -410,6 +440,11 @@ async function handleFavorite(event: { listing: Listing; favorited: boolean }) {
 
 onMounted(load)
 onBeforeUnmount(() => abort?.abort())
+
+// Reset breed filter when pet type changes
+watch(petType, () => {
+  selectedBreed.value = ''
+})
 </script>
 
 <style scoped>
