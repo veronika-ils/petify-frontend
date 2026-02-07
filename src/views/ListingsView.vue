@@ -16,7 +16,10 @@
                 :class="['pet-btn', { active: petType === pet.value }]"
                 @click="petType = pet.value"
               >
-                <span class="pet-icon">{{ pet.icon }}</span>
+                <span class="pet-icon">
+                  <img v-if="pet.type === 'image'" :src="pet.icon" :alt="pet.label" class="pet-icon-img" />
+                  <span v-else>{{ pet.icon }}</span>
+                </span>
                 <span>{{ pet.label }}</span>
               </button>
             </div>
@@ -171,10 +174,10 @@ const geoError = ref<string | null>(null)
 const geoCoords = ref<{ lat: number; lng: number } | null>(null)
 
 const petTypes = [
-  { value: '', label: 'All pets', icon: '🐾' },
-  { value: 'Dog', label: 'Dogs', icon: '🐕' },
-  { value: 'Cat', label: 'Cats', icon: '🐈' },
-  { value: 'Other', label: 'Other', icon: '🦎' },
+  { value: '', label: 'All pets', icon: new URL('../img/all_outline.png', import.meta.url).href, type: 'image' },
+  { value: 'Dog', label: 'Dogs', icon: new URL('../img/dog_outline.png', import.meta.url).href, type: 'image' },
+  { value: 'Cat', label: 'Cats', icon: new URL('../img/cat_outline.png', import.meta.url).href, type: 'image' },
+  { value: 'Other', label: 'Other', icon: new URL('../img/bird_outline.png', import.meta.url).href, type: 'image' },
 ]
 
 const breedOptions = computed(() => {
@@ -469,6 +472,12 @@ onBeforeUnmount(() => abort?.abort())
 
 .pet-icon {
   font-size: 1.5rem;
+}
+
+.pet-icon-img {
+  width: 5rem;
+  height: 4rem;
+  object-fit: contain;
 }
 
 .search-inputs {

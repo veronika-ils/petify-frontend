@@ -1,7 +1,7 @@
-<template>
-  <div class="owner-profile-main">
+<template xmlns="http://www.w3.org/1999/html">
+  <div class="profile-container">
     <!-- Header with back button -->
-    <header class="header-section">
+    <header class="header-section header-simple">
       <div class="container">
         <RouterLink to="/" class="back-link">← Back to listings</RouterLink>
       </div>
@@ -26,20 +26,21 @@
     <!-- Owner Profile Content -->
     <div v-else-if="ownerInfo" class="profile-container">
       <!-- Owner Info Card -->
-      <section class="owner-info-section">
+      <section class="header-section">
         <div class="container">
-          <div class="owner-card">
-            <div class="owner-header">
-              <div class="owner-details">
-                <h1 class="owner-name">{{ ownerInfo.firstName }} {{ ownerInfo.lastName }}</h1>
-                <p class="owner-username">@{{ ownerInfo.username }}</p>
-                <p class="owner-email">
+          <div class="profile-card">
+            <div class="profile-content">
+              <div class="profile-info">
+                <h1 class="profile-name">{{ ownerInfo.firstName }} {{ ownerInfo.lastName }}</h1>
+                <p class="profile-username">@{{ ownerInfo.username }}</p>
+                <p class="profile-email">
+                  <i class="bi bi-envelope"></i>
                   <a :href="`mailto:${ownerInfo.email}`">{{ ownerInfo.email }}</a>
                 </p>
               </div>
-              <div class="contact-actions">
-                <button class="btn-contact" type="button" @click="contactOwner">
-                  📧 Contact Owner
+              <div class="profile-badge">
+                <button class="btn btn-primary btn-sm" type="button" @click="contactOwner">
+                  <i class="bi bi-envelope"></i> Contact Owner
                 </button>
               </div>
             </div>
@@ -48,40 +49,55 @@
       </section>
 
       <!-- Tabs for listings and pets -->
-      <section class="content-section">
+      <section class="main-content">
         <div class="container">
-          <div class="tabs-wrapper">
-            <div class="tabs-header">
-              <button
-                :class="['tab-button', { active: activeTab === 'listings' }]"
-                @click="activeTab = 'listings'"
-              >
-                📋 Listings ({{ ownerListings.length }})
-              </button>
-              <button
-                :class="['tab-button', { active: activeTab === 'pets' }]"
-                @click="activeTab = 'pets'"
-              >
-                🐾 Pets ({{ ownerPets.length }})
-              </button>
-              <button
-                :class="['tab-button', { active: activeTab === 'reviews' }]"
-                @click="activeTab = 'reviews'"
-              >
-                ⭐ Reviews ({{ ownerReviews.length }})
-              </button>
-            </div>
+          <div class="tabs-container">
+            <ul class="nav nav-tabs nav-fill" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button
+                  class="nav-link"
+                  :class="{ active: activeTab === 'listings' }"
+                  @click="activeTab = 'listings'"
+                  type="button"
+                  role="tab"
+                >
+                  <i class="bi bi-bookmark-fill"></i> Listings ({{ ownerListings.length }})
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button
+                  class="nav-link"
+                  :class="{ active: activeTab === 'pets' }"
+                  @click="activeTab = 'pets'"
+                  type="button"
+                  role="tab"
+                >
+                  <i class="bi bi-paw-fill"></i> Pets ({{ ownerPets.length }})
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button
+                  class="nav-link"
+                  :class="{ active: activeTab === 'reviews' }"
+                  @click="activeTab = 'reviews'"
+                  type="button"
+                  role="tab"
+                >
+                  <i class="bi bi-star-fill"></i> Reviews ({{ ownerReviews.length }})
+                </button>
+              </li>
+            </ul>
 
             <!-- Listings Tab -->
-            <div v-if="activeTab === 'listings'" class="tab-content">
+            <div v-if="activeTab === 'listings'" class="tab-content-section">
               <h2 class="section-title">Owner's Listings</h2>
 
               <div v-if="ownerListings.length === 0" class="empty-state">
                 <p>This owner hasn't created any listings yet.</p>
               </div>
 
-              <div v-else class="listings-grid">
-                <div v-for="listing in ownerListings" :key="listing.listingId" class="listing-item">
+              <div v-else class="grid-container">
+                <div v-for="listing in ownerListings" :key="listing.listingId" class="listing-card-wrapper">
                   <RouterLink :to="`/listing/${listing.listingId}`" class="listing-link">
                     <div class="listing-card">
                       <div class="listing-status" :class="statusClass(listing.status)">
@@ -106,59 +122,65 @@
             </div>
 
             <!-- Pets Tab -->
-            <div v-if="activeTab === 'pets'" class="tab-content">
+            <div v-if="activeTab === 'pets'" class="tab-content-section">
               <h2 class="section-title">Owner's Pets</h2>
 
               <div v-if="ownerPets.length === 0" class="empty-state">
                 <p>This owner hasn't added any pets yet.</p>
               </div>
 
-              <div v-else class="pets-grid">
-                <div v-for="pet in ownerPets" :key="pet.animalId" class="pet-card">
-                  <div v-if="pet.photoUrl" class="pet-image">
-                    <img :src="pet.photoUrl" :alt="pet.name" @error="onPetImageError" />
-                  </div>
-                  <div v-else class="pet-image placeholder">
-                    🐾
-                  </div>
-                  <div class="pet-info">
-                    <h3 class="pet-name">{{ pet.name }}</h3>
-                    <ul class="pet-details">
-                      <li v-if="pet.species">
-                        <span class="label">Species:</span>
+              <div v-else class="grid-container">
+                <div v-for="pet in ownerPets" :key="pet.animalId" class="pet-card-wrapper">
+                  <div class="pet-card">
+                    <div class="pet-image-wrapper">
+                      <img
+                        v-if="pet.photoUrl"
+                        :src="pet.photoUrl"
+                        :alt="pet.name"
+                        class="pet-image"
+                        @error="onPetImageError"
+                      />
+                      <img v-else src="@/img/all_outline.png" :alt="`${pet.name} placeholder`" class="pet-image-placeholder-img" />
+                    </div>
+                    <div class="pet-header">
+                      <h3 class="pet-name">{{ pet.name }}</h3>
+                    </div>
+                    <div class="pet-details">
+                      <div v-if="pet.species" class="pet-detail-row">
+                        <span class="label">Species</span>
                         <span class="value">{{ pet.species }}</span>
-                      </li>
-                      <li v-if="pet.breed">
-                        <span class="label">Breed:</span>
+                      </div>
+                      <div v-if="pet.breed" class="pet-detail-row">
+                        <span class="label">Breed</span>
                         <span class="value">{{ pet.breed }}</span>
-                      </li>
-                      <li v-if="pet.sex">
-                        <span class="label">Sex:</span>
+                      </div>
+                      <div v-if="pet.sex" class="pet-detail-row">
+                        <span class="label">Sex</span>
                         <span class="value">{{ pet.sex }}</span>
-                      </li>
-                      <li v-if="pet.dateOfBirth">
-                        <span class="label">DOB:</span>
+                      </div>
+                      <div v-if="pet.dateOfBirth" class="pet-detail-row">
+                        <span class="label">DOB</span>
                         <span class="value">{{ formatDate(pet.dateOfBirth) }}</span>
-                      </li>
-                    </ul>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
             <!-- Reviews Tab -->
-            <div v-if="activeTab === 'reviews'" class="tab-content">
+            <div v-if="activeTab === 'reviews'" class="tab-content-section">
               <h2 class="section-title">Reviews ({{ ownerReviews.length }})</h2>
 
               <!-- Add Review Form (only if logged in and not own profile) -->
               <div
                 v-if="auth.isAuthenticated && ownerInfo && auth.user?.userId !== ownerInfo.userId"
-                class="add-review-card"
+                class="form-card"
               >
-                <h3 class="add-review-title">Leave a Review</h3>
+                <h3 class="section-title" style="font-size: 1.3rem; margin-top: 0">Leave a Review</h3>
                 <form @submit.prevent="submitReview">
                   <div class="form-group">
-                    <label class="label">Rating</label>
+                    <label class="form-label">Rating</label>
                     <div class="rating-input">
                       <button
                         v-for="i in 5"
@@ -167,13 +189,20 @@
                         :class="['star-btn', { active: newReview.rating === i }]"
                         @click="newReview.rating = i"
                       >
-                        {{ i <= newReview.rating ? '⭐' : '☆' }}
+                        <img
+                          :src="starImg"
+                          :alt="`${i} star rating`"
+                          class="star-btn-img"
+                          :style="{ opacity: i <= newReview.rating ? 1 : 0.3 }"
+                        />
+
+
                       </button>
                     </div>
                   </div>
 
                   <div class="form-group">
-                    <label class="label" for="comment">Comment</label>
+                    <label class="form-label" for="comment">Comment</label>
                     <textarea
                       id="comment"
                       v-model="newReview.comment"
@@ -213,7 +242,15 @@
                       <p class="reviewer-username">@{{ review.reviewerUsername }}</p>
                     </div>
                     <div class="review-actions">
-                      <span class="rating">{{ '⭐'.repeat(Number(review.rating || 0)) }}</span>
+                      <div class="rating">
+                        <img
+                          v-for="i in Number(review.rating || 0)"
+                          :key="i"
+                          src="@/img/star.png"
+                          alt="star"
+                          class="review-star"
+                        />
+                      </div>
                       <button
                         v-if="
                           auth.isAuthenticated &&
@@ -223,7 +260,7 @@
                         class="delete-btn"
                         @click="deleteReview(review.reviewId)"
                       >
-                        🗑️
+                        <img src="@/img/trashcan.png" alt="delete" class="delete-btn-img" />
                       </button>
                     </div>
                   </div>
@@ -235,11 +272,12 @@
           </div>
         </div>
       </section>
+      </div>
     </div>
-  </div>
 </template>
 
 <script setup lang="ts">
+import starImg from '@/img/star.png'
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { getUserProfile, getUserListings, getUserPets } from '../api/profile'
@@ -433,175 +471,174 @@ onBeforeUnmount(() => abort?.abort())
 </script>
 
 <style scoped>
-.owner-profile-main {
-  background: #f9fafb;
+.profile-container {
+  background: linear-gradient(135deg, #f5f7fa 0%, #f0f3f8 100%);
   min-height: 100vh;
   padding-bottom: 60px;
 }
 
 /* Header Section */
 .header-section {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  padding: 40px 0;
+  margin-bottom: 40px;
+  box-shadow: 0 10px 30px rgba(249, 115, 22, 0.2);
+}
+
+.header-section.header-simple {
   background: white;
-  border-bottom: 1px solid #e5e7eb;
   padding: 20px 0;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  margin-bottom: 0;
+  box-shadow: none;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .back-link {
   display: inline-flex;
   align-items: center;
-  color: #d97706;
+  color: #f97316;
   text-decoration: none;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 0.95rem;
   transition: all 0.2s ease;
 }
 
 .back-link:hover {
-  color: #b45309;
-  gap: 4px;
+  color: #ea580c;
+  transform: translateX(-4px);
 }
 
-/* Owner Info Section */
-.owner-info-section {
+.profile-card {
   background: white;
-  padding: 40px 0;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.owner-card {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
   border-radius: 16px;
-  padding: 40px;
-  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.1);
+  padding: 30px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
-.owner-header {
+.profile-content {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 30px;
-  flex-wrap: wrap;
 }
 
-.owner-details {
+.profile-info {
   flex: 1;
-  min-width: 300px;
 }
 
-.owner-name {
+.profile-name {
   font-size: 2.5rem;
   font-weight: 700;
+  color: #1a202c;
   margin: 0 0 12px 0;
-  color: #111827;
+  letter-spacing: -0.5px;
 }
 
-.owner-username {
-  color: #6b7280;
-  font-size: 1rem;
+.profile-username {
+  font-size: 1.1rem;
+  color: #718096;
   margin: 0 0 8px 0;
+  font-weight: 500;
 }
 
-.owner-email {
-  color: #374151;
+.profile-email {
   font-size: 1rem;
+  color: #4a5568;
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.owner-email a {
-  color: #d97706;
+.profile-email a {
+  color: #4a5568;
   text-decoration: none;
-  font-weight: 600;
   transition: color 0.2s ease;
 }
 
-.owner-email a:hover {
-  color: #b45309;
+.profile-email a:hover {
+  color: #2d3748;
 }
 
-.contact-actions {
+.profile-badge {
   display: flex;
-  gap: 12px;
+  align-items: center;
 }
 
-.btn-contact {
-  padding: 14px 24px;
-  border-radius: 8px;
-  border: none;
-  background: #d97706;
-  color: white;
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
+/* Main Content */
+.main-content {
+  padding: 0;
 }
 
-.btn-contact:hover {
-  background: #b45309;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
-}
-
-/* Content Section */
-.content-section {
-  padding: 40px 0;
-}
-
-.tabs-wrapper {
+.tabs-container {
   background: white;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
 
-.tabs-header {
-  display: flex;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9fafb;
+/* Tabs */
+.nav-tabs {
+  border-bottom: 2px solid #e2e8f0;
+  background: #f7fafc;
+  padding: 0;
+  margin: 0;
 }
 
-.tab-button {
-  flex: 1;
-  padding: 20px;
+.nav-tabs .nav-link {
+  color: #718096;
   border: none;
-  background: transparent;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #6b7280;
-  cursor: pointer;
-  transition: all 0.2s ease;
   border-bottom: 3px solid transparent;
+  font-weight: 600;
+  padding: 16px 24px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
 }
 
-.tab-button:hover {
-  color: #111827;
-  background: #f3f4f6;
+.nav-tabs .nav-link:hover {
+  color: #2d3748;
+  background: #edf2f7;
 }
 
-.tab-button.active {
-  color: #d97706;
-  border-bottom-color: #d97706;
+.nav-tabs .nav-link.active {
+  color: #f97316;
+  border-bottom-color: #f97316;
   background: white;
 }
 
-.tab-content {
+/* Tab Content */
+.tab-content-section {
   padding: 40px;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .section-title {
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   font-weight: 700;
+  color: #1a202c;
   margin: 0 0 30px 0;
-  color: #111827;
+  letter-spacing: -0.5px;
 }
 
+/* Empty State */
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: #6b7280;
+  color: #718096;
 }
 
 .empty-state p {
@@ -609,15 +646,35 @@ onBeforeUnmount(() => abort?.abort())
   margin: 0;
 }
 
-/* Listings Grid */
-.listings-grid {
+/* Grid Container */
+.grid-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 24px;
 }
 
-.listing-item {
+/* Listing Card */
+.listing-card-wrapper {
   height: 100%;
+}
+
+.listing-card {
+  background: white;
+  border: none;
+  border-radius: 16px;
+  padding: 24px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  position: relative;
+}
+
+.listing-card:hover {
+  box-shadow: 0 16px 32px rgba(249, 115, 22, 0.12);
+  transform: translateY(-8px);
 }
 
 .listing-link {
@@ -626,34 +683,16 @@ onBeforeUnmount(() => abort?.abort())
   height: 100%;
 }
 
-.listing-card {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 24px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.listing-card:hover {
-  border-color: #d97706;
-  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.15);
-  transform: translateY(-4px);
-}
-
 .listing-status {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  padding: 6px 12px;
-  border-radius: 6px;
+  top: 16px;
+  right: 16px;
+  padding: 8px 14px;
+  border-radius: 8px;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .status-active {
@@ -672,16 +711,17 @@ onBeforeUnmount(() => abort?.abort())
 }
 
 .listing-title {
-  font-size: 1.25rem;
+  font-size: 1.3rem;
   font-weight: 700;
-  margin: 0 0 8px 0;
-  color: #111827;
-  margin-top: 8px;
+  color: #1a202c;
+  margin: 0;
+  line-height: 1.4;
 }
 
 .listing-description {
-  color: #6b7280;
+  color: #4a5568;
   font-size: 0.95rem;
+  line-height: 1.6;
   margin: 0;
   flex: 1;
   overflow: hidden;
@@ -695,124 +735,174 @@ onBeforeUnmount(() => abort?.abort())
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid #f3f4f6;
-  font-size: 0.875rem;
+  margin-top: auto;
 }
 
 .listing-price {
-  font-weight: 700;
-  color: #d97706;
-  font-size: 1.1rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #f97316;
+  letter-spacing: -0.5px;
 }
 
 .listing-date {
-  color: #9ca3af;
+  color: #a0aec0;
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
-/* Pets Grid */
-.pets-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 24px;
+.listing-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.listing-actions .form-select {
+  flex: 1;
+}
+
+/* Pet Card */
+.pet-card-wrapper {
+  height: 100%;
 }
 
 .pet-card {
   background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border: none;
+  border-radius: 16px;
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   overflow: hidden;
-  transition: all 0.2s ease;
 }
 
 .pet-card:hover {
-  border-color: #d97706;
-  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.15);
-  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(249, 115, 22, 0.12);
+  transform: translateY(-8px);
 }
 
-.pet-image {
+.pet-image-wrapper {
   width: 100%;
-  height: 200px;
-  background: #f3f4f6;
+  height: 220px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #f0f3f8 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 3rem;
   overflow: hidden;
 }
 
-.pet-image img {
+.pet-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.pet-image.placeholder {
+.pet-image-placeholder {
+  width: 100%;
+  height: 100%;
   background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.pet-info {
-  padding: 20px;
+.pet-emoji {
+  font-size: 3rem;
+}
+
+.pet-image-placeholder-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pet-header {
+  border-bottom: none;
+  padding: 0 20px 0 20px;
+  padding-top: 16px;
 }
 
 .pet-name {
-  font-size: 1.25rem;
+  font-size: 1.3rem;
   font-weight: 700;
-  margin: 0 0 16px 0;
-  color: #111827;
+  margin: 0;
+  color: #1a202c;
+  line-height: 1.4;
 }
 
 .pet-details {
   list-style: none;
-  padding: 0;
+  padding: 0 20px 20px 20px;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+  flex: 1;
 }
 
-.pet-details li {
+.pet-detail-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.875rem;
+  padding: 10px 0;
+  border-bottom: none;
+  font-size: 0.9rem;
 }
 
-.pet-details .label {
-  color: #6b7280;
+.pet-detail-row:last-child {
+  border-bottom: none;
+}
+
+.pet-detail-row .label {
+  color: #718096;
   font-weight: 600;
+  text-transform: capitalize;
+  font-size: 0.9rem;
 }
 
-.pet-details .value {
-  color: #111827;
+.pet-detail-row .value {
+  color: #2d3748;
+  font-weight: 500;
 }
 
-/* Reviews Section */
-.add-review-card {
+/* Review Card */
+.review-card {
   background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border: none;
+  border-radius: 16px;
   padding: 24px;
-  margin-bottom: 32px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.add-review-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin: 0 0 20px 0;
-  color: #111827;
+.review-card:hover {
+  box-shadow: 0 12px 24px rgba(249, 115, 22, 0.1);
+  transform: translateY(-4px);
+}
+
+/* Form Card */
+.form-card {
+  background: white;
+  border: none;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 32px;
 }
 
 .form-group {
   margin-bottom: 20px;
 }
 
-.label {
+.form-label {
   display: block;
   font-weight: 600;
-  color: #374151;
+  color: #2d3748;
   margin-bottom: 8px;
   font-size: 0.95rem;
 }
@@ -820,70 +910,94 @@ onBeforeUnmount(() => abort?.abort())
 .rating-input {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .star-btn {
-  background: none;
-  border: 2px solid #e5e7eb;
+  background: white;
+  border: 2px solid #e2e8f0;
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 1.5rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .star-btn:hover {
-  border-color: #d97706;
-  background: #fef3c7;
+  border-color: #f97316;
+  background: #fff8f1;
 }
 
 .star-btn.active {
-  border-color: #d97706;
-  background: #fef3c7;
+  border-color: #f97316;
+  background: #fff8f1;
+}
+
+.star-btn-img {
+  width: 1.5rem;
+  height: 1.5rem;
+  object-fit: contain;
 }
 
 .form-control {
   width: 100%;
   padding: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1.5px solid #e2e8f0;
   border-radius: 8px;
   font-family: inherit;
   font-size: 0.95rem;
-  color: #111827;
+  color: #1a202c;
   resize: vertical;
+  transition: all 0.2s ease;
 }
 
 .form-control:focus {
   outline: none;
-  border-color: #d97706;
-  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
 }
 
 .form-actions {
   display: flex;
   gap: 12px;
-  margin-top: 20px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
 }
 
+.reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Buttons */
 .btn {
-  padding: 12px 24px;
-  border: none;
   border-radius: 8px;
   font-weight: 600;
-  cursor: pointer;
+  padding: 10px 20px;
   transition: all 0.2s ease;
   font-size: 0.95rem;
+  border: none;
+  cursor: pointer;
 }
 
 .btn-primary {
-  background: #d97706;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #b45309;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+  box-shadow: 0 8px 20px rgba(249, 115, 22, 0.3);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.85rem;
 }
 
 .btn:disabled {
@@ -891,8 +1005,20 @@ onBeforeUnmount(() => abort?.abort())
   cursor: not-allowed;
 }
 
+.btn-outline-danger {
+  border: 1.5px solid #f56565;
+  color: #f56565;
+  background: transparent;
+}
+
+.btn-outline-danger:hover {
+  background: #fff5f5;
+  border-color: #e53e3e;
+}
+
+/* Alerts */
 .alert {
-  padding: 12px 16px;
+  padding: 16px;
   border-radius: 8px;
   margin-bottom: 16px;
 }
@@ -903,24 +1029,6 @@ onBeforeUnmount(() => abort?.abort())
   border: 1px solid #fecaca;
 }
 
-.reviews-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.review-card {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 20px;
-  transition: all 0.2s ease;
-}
-
-.review-card:hover {
-  border-color: #d97706;
-  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.1);
-}
 
 .review-header {
   display: flex;
@@ -957,20 +1065,37 @@ onBeforeUnmount(() => abort?.abort())
 .rating {
   font-size: 1rem;
   color: #f59e0b;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.review-star {
+  width: 1.5rem;
+  height: 1.5rem;
+  object-fit: contain;
 }
 
 .delete-btn {
   background: none;
   border: none;
-  font-size: 1.25rem;
   cursor: pointer;
   opacity: 0.6;
   transition: opacity 0.2s ease;
   padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .delete-btn:hover {
   opacity: 1;
+}
+
+.delete-btn-img {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
 }
 
 .review-comment {
