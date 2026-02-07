@@ -151,6 +151,7 @@ import { fetchListings } from '../api/listings'
 import { mockListings } from '../data/mockListings'
 import { useAuthStore } from '../stores/auth'
 import { addFavorite, removeFavorite, getFavoritedListings } from '../api/favorites'
+import { getPet } from '../api/profile'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -287,7 +288,30 @@ async function load() {
 
   try {
     const data = await fetchListings({ signal: abort.signal })
-    listings.value = data
+
+    // Fetch pet images for each listing
+    const listingsWithImages = await Promise.all(
+      data.map(async (listing) => {
+        try {
+          if (listing.animalId) {
+            const pet = await getPet(listing.animalId)
+            return {
+              ...listing,
+              imageUrl: pet.photoUrl || new URL('../img/all_outline.png', import.meta.url).href,
+            }
+          }
+        } catch (err) {
+          // If pet fetch fails, just continue without image
+          console.error(`Failed to fetch pet ${listing.animalId}:`, err)
+        }
+        return {
+          ...listing,
+          imageUrl: new URL('../img/all_outline.png', import.meta.url).href,
+        }
+      })
+    )
+
+    listings.value = listingsWithImages
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     error.value = message

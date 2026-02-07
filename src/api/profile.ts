@@ -187,3 +187,20 @@ export async function updateListingStatus(
 
   return await response.json()
 }
+
+export async function getPet(petId: number): Promise<Pet> {
+  const url = joinUrl(getBaseUrl(), `/api/pets/${petId}`)
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch pet: ${response.statusText}`)
+  }
+
+  return await response.json()
+}
+

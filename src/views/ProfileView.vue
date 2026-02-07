@@ -104,7 +104,7 @@
               <div v-for="listing in listings" :key="listing.listingId" class="listing-card-wrapper">
                 <div class="listing-card">
                   <div class="listing-header">
-                    <h5 class="listing-title">Animal #{{ listing.animalId }}</h5>
+                    <h5 class="listing-title">{{ getPetName(listing.animalId) }}</h5>
                     <span class="badge" :class="getStatusBadgeClass(listing.status)">
                       {{ listing.status }}
                     </span>
@@ -389,7 +389,7 @@
                     <i class="bi bi-heart-fill"></i>
                   </div>
                   <div class="listing-header">
-                    <h5 class="listing-title">Animal #{{ listing.animalId }}</h5>
+                    <h5 class="listing-title">{{ getPetName(listing.animalId) }}</h5>
                     <span class="badge" :class="getStatusBadgeClass(listing.status)">
                       {{ listing.status }}
                     </span>
@@ -465,6 +465,20 @@ const isOwner = computed(() => {
 const userType = computed(() => {
   return auth.user?.userType || 'Unknown'
 })
+
+// Create a map of petId to pet name
+const petNameMap = computed(() => {
+  const map: Record<number, string> = {}
+  pets.value.forEach((pet) => {
+    map[pet.animalId] = pet.name
+  })
+  return map
+})
+
+// Get pet name for listing
+function getPetName(animalId: number): string {
+  return petNameMap.value[animalId] || 'Unknown Pet'
+}
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString)

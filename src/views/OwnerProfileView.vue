@@ -104,7 +104,7 @@
                         {{ listing.status || 'Active' }}
                       </div>
 
-                      <h3 class="listing-title">Animal #{{ listing.animalId }}</h3>
+                      <h3 class="listing-title">{{ getPetName(listing.animalId) }}</h3>
                       <p class="listing-description">{{ listing.description }}</p>
 
                       <div class="listing-footer">
@@ -278,7 +278,7 @@
 
 <script setup lang="ts">
 import starImg from '@/img/star.png'
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { getUserProfile, getUserListings, getUserPets } from '../api/profile'
 import { createReview, getReviewsByOwner, deleteReview as deleteReviewAPI } from '../api/reviews'
@@ -303,6 +303,20 @@ const newReview = ref({
   rating: 0,
   comment: '',
 })
+
+// Create a map of petId to pet name
+const petNameMap = computed(() => {
+  const map: Record<number, string> = {}
+  ownerPets.value.forEach((pet) => {
+    map[pet.animalId] = pet.name
+  })
+  return map
+})
+
+// Get pet name for listing
+function getPetName(animalId: number): string {
+  return petNameMap.value[animalId] || 'Unknown Pet'
+}
 
 let abort: AbortController | null = null
 

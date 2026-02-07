@@ -144,14 +144,57 @@
         </div>
       </section>
     </div>
+
+    <!-- Related Listings Section -->
+    <section v-if="relatedListings.length > 0" class="related-listings-section">
+      <div class="container">
+        <h2 class="related-title">More Listings</h2>
+        <div class="related-listings-grid">
+          <article
+            v-for="relatedListing in relatedListings"
+            :key="relatedListing.id"
+            class="related-listing-card"
+            @click="goToListing(relatedListing.id)"
+            role="button"
+            tabindex="0"
+            @keydown.enter="goToListing(relatedListing.id)"
+          >
+            <div class="related-image-wrapper">
+              <img
+                :src="getRelatedListingImage(relatedListing)"
+                :alt="relatedListing.title || 'Pet listing'"
+                class="related-image"
+                @error="(e) => handleRelatedImageError(e)"
+              />
+              <button
+                class="related-favorite-btn"
+                type="button"
+                @click.stop="toggleRelatedFavorite(relatedListing.id)"
+                :aria-pressed="isRelatedFavorited(relatedListing.id)"
+                :title="isRelatedFavorited(relatedListing.id) ? 'Remove from favorites' : 'Add to favorites'"
+              >
+                {{ isRelatedFavorited(relatedListing.id) ? '♥' : '♡' }}
+              </button>
+              <div v-if="relatedListing.status" class="related-badge">{{ relatedListing.status }}</div>
+            </div>
+            <div class="related-content">
+              <h3 class="related-listing-title">{{ relatedListing.title }}</h3>
+              <p v-if="relatedListing.petType" class="related-pet-type">{{ relatedListing.petType }}</p>
+              <div v-if="relatedListing.price" class="related-price">${{ Number(relatedListing.price).toFixed(2) }}</div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
   </main>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onBeforeUnmount, onMounted } from 'vue'
+import { computed, ref, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import type { Listing } from '../types/listing'
-import { fetchListingById, fetchUserName, fetchPetName } from '../api/listings'
+import { fetchListingById, fetchUserName, fetchPetName, fetchListings } from '../api/listings'
+import { getPet } from '../api/profile'
 import { useAuthStore } from '../stores/auth'
 import { addFavorite, removeFavorite } from '../api/favorites'
 
@@ -168,11 +211,12 @@ const animalName = ref<string | null>(null)
 const isFavorited = ref(false)
 const imageBroken = ref(false)
 const copyLinkText = ref('Copy link')
+const relatedListings = ref<Listing[]>([])
+const relatedFavoritedIds = ref<Set<string | number>>(new Set())
 
 let abort: AbortController | null = null
 
-const placeholderImage =
-  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="100%" height="100%" fill="%23f2f3f5"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="24" fill="%238a8f98">Petify</text></svg>'
+const placeholderImage = new URL('../img/all_outline.png', import.meta.url).href
 
 const imageSrc = computed(() => {
   if (imageBroken.value) return placeholderImage
@@ -244,6 +288,7 @@ async function load() {
   ownerName.value = null
   animalName.value = null
   isFavorited.value = false
+  relatedListings.value = []
 
   abort?.abort()
   abort = new AbortController()
@@ -252,14 +297,51 @@ async function load() {
     const data = await fetchListingById(id.value, { signal: abort.signal })
     listing.value = data
 
-    // Fetch owner and animal names in parallel
-    const [ownerNameResult, animalNameResult] = await Promise.all([
+    // Fetch owner, animal names, and pet image in parallel
+    const [ownerNameResult, animalNameResult, petResult] = await Promise.all([
       data.ownerId ? fetchUserName(data.ownerId, { signal: abort.signal }) : Promise.resolve(null),
       data.animalId ? fetchPetName(data.animalId, { signal: abort.signal }) : Promise.resolve(null),
+      data.animalId ? getPet(data.animalId) : Promise.resolve(null),
     ])
 
     ownerName.value = ownerNameResult
     animalName.value = animalNameResult
+
+    // Add pet image to listing
+    if (listing.value && petResult?.photoUrl) {
+      listing.value.imageUrl = petResult.photoUrl
+    }
+
+    // Fetch related listings
+    const allListings = await fetchListings({ signal: abort.signal })
+    // Filter out the current listing and get up to 6 related listings
+    const related = allListings
+      .filter((l) => l.id !== id.value)
+      .slice(0, 6)
+
+    // Fetch pet images for related listings
+    const listingsWithImages = await Promise.all(
+      related.map(async (listing) => {
+        try {
+          if (listing.animalId) {
+            const pet = await getPet(listing.animalId)
+            return {
+              ...listing,
+              imageUrl: pet.photoUrl || new URL('../img/all_outline.png', import.meta.url).href,
+            }
+          }
+        } catch (err) {
+          console.error(`Failed to fetch pet ${listing.animalId}:`, err)
+        }
+        return {
+          ...listing,
+          imageUrl: new URL('../img/all_outline.png', import.meta.url).href,
+        }
+      })
+    )
+
+    relatedListings.value = listingsWithImages
+
     checkFavorite()
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
@@ -329,8 +411,51 @@ function copyLink() {
     })
 }
 
+function getRelatedListingImage(relatedListing: Listing): string {
+  return relatedListing.imageUrl || new URL('../img/all_outline.png', import.meta.url).href
+}
+
+function handleRelatedImageError(e: Event) {
+  const img = e.target as HTMLImageElement
+  img.src = new URL('../img/all_outline.png', import.meta.url).href
+}
+
+function goToListing(listingId: string | number) {
+  router.push({ name: 'listing-details', params: { id: listingId } })
+}
+
+function isRelatedFavorited(listingId: string | number): boolean {
+  return relatedFavoritedIds.value.has(listingId)
+}
+
+async function toggleRelatedFavorite(listingId: string | number) {
+  if (!auth.isAuthenticated || !auth.user?.userId) {
+    alert('Please log in to save favorites')
+    return
+  }
+
+  try {
+    const id = Number(listingId)
+    if (isRelatedFavorited(listingId)) {
+      await removeFavorite(auth.user.userId, id)
+      relatedFavoritedIds.value.delete(listingId)
+    } else {
+      await addFavorite(auth.user.userId, id)
+      relatedFavoritedIds.value.add(listingId)
+    }
+  } catch (error) {
+    console.error('Failed to update favorite:', error)
+    alert('Failed to update favorite. Please try again.')
+  }
+}
+
 onMounted(load)
 onBeforeUnmount(() => abort?.abort())
+
+// Watch for route changes and reload listing
+watch(id, () => {
+  load()
+})
 </script>
 
 <style scoped>
@@ -670,6 +795,119 @@ onBeforeUnmount(() => abort?.abort())
 .share-btn:hover {
   border-color: #d97706;
   background: #fef3c7;
+}
+
+/* Related Listings Section */
+.related-listings-section {
+  background: white;
+  padding: 60px 0;
+  border-top: 1px solid #e5e7eb;
+}
+
+.related-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 40px 0;
+  letter-spacing: -0.5px;
+}
+
+.related-listings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.related-listing-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.related-listing-card:hover {
+  border-color: #d97706;
+  box-shadow: 0 8px 24px rgba(217, 119, 6, 0.15);
+  transform: translateY(-4px);
+}
+
+.related-image-wrapper {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  background: #f3f4f6;
+  overflow: hidden;
+}
+
+.related-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.related-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: #d97706;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.related-favorite-btn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #e5e7eb;
+  font-size: 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 0;
+}
+
+.related-favorite-btn:hover {
+  background: #fef3c7;
+  border-color: #d97706;
+  transform: scale(1.1);
+}
+
+.related-content {
+  padding: 16px;
+}
+
+.related-listing-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  color: #111827;
+  line-height: 1.4;
+}
+
+.related-pet-type {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0 0 8px 0;
+}
+
+.related-price {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #d97706;
+  margin: 0;
 }
 
 /* Responsive */
