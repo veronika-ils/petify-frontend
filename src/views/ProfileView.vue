@@ -384,11 +384,22 @@
             </div>
             <div v-else class="grid-container">
               <div v-for="listing in favorites" :key="listing.listingId" class="listing-card-wrapper">
-                <div class="listing-card favorite">
-                  <div class="favorite-badge">
-                    <i class="bi bi-heart-fill"></i>
+                <div
+                  class="listing-card favorite-listing"
+                  @click="goToListing(listing.listingId)"
+                  role="button"
+                  tabindex="0"
+                  @keydown.enter="goToListing(listing.listingId)"
+                >
+                  <div class="favorite-image-wrapper">
+                    <img
+                      :src="getFavoriteListingImage(listing)"
+                      :alt="getPetName(listing.animalId)"
+                      class="favorite-image"
+                      @error="(e) => handleFavoriteImageError(e)"
+                    />
                   </div>
-                  <div class="listing-header">
+                  <div class="favorite-content">
                     <h5 class="listing-title">{{ getPetName(listing.animalId) }}</h5>
                     <span class="badge" :class="getStatusBadgeClass(listing.status)">
                       {{ listing.status }}
@@ -400,7 +411,7 @@
                     <small class="listing-date">{{ formatDate(listing.createdAt) }}</small>
                   </div>
                   <button
-                    @click="removeFavorite(listing.listingId)"
+                    @click.stop="removeFavorite(listing.listingId)"
                     class="btn btn-sm btn-outline-danger w-100"
                   >
                     <i class="bi bi-heart-fill"></i> Remove from Favorites
@@ -426,6 +437,7 @@ import {
   createPet,
   deleteListing,
   updateListingStatus,
+  getPet,
 } from '../api/profile'
 import { getFavoritedListings, removeFavorite as removeFavoriteAPI } from '../api/favorites'
 
@@ -466,17 +478,30 @@ const userType = computed(() => {
   return auth.user?.userType || 'Unknown'
 })
 
+// Store pet details cache for images
+const petDetailsCache = ref<Map<number, any>>(new Map())
+
 // Create a map of petId to pet name
 const petNameMap = computed(() => {
   const map: Record<number, string> = {}
+  // Add pets from the pets list
   pets.value.forEach((pet) => {
     map[pet.animalId] = pet.name
+  })
+  // Add pets from cache (favorites)
+  petDetailsCache.value.forEach((pet, animalId) => {
+    map[animalId] = pet.name
   })
   return map
 })
 
 // Get pet name for listing
 function getPetName(animalId: number): string {
+  // Check cache first (from favorites loading)
+  if (petDetailsCache.value.has(animalId)) {
+    return petDetailsCache.value.get(animalId)?.name || 'Unknown Pet'
+  }
+  // Fall back to petNameMap (from pets list)
   return petNameMap.value[animalId] || 'Unknown Pet'
 }
 
@@ -648,7 +673,31 @@ async function loadFavorites() {
   if (!auth.user?.userId) return
   try {
     isLoading.value = true
-    favorites.value = await getFavoritedListings(auth.user.userId)
+    const favoritesData = await getFavoritedListings(auth.user.userId)
+
+    // Fetch pet images for each favorite listing
+    const favoritesWithImages = await Promise.all(
+      favoritesData.map(async (listing) => {
+        try {
+          if (listing.animalId) {
+            const pet = await getPet(listing.animalId)
+            petDetailsCache.value.set(listing.animalId, pet)
+            return {
+              ...listing,
+              imageUrl: pet.photoUrl || new URL('../img/all_outline.png', import.meta.url).href,
+            }
+          }
+        } catch (err) {
+          console.error(`Failed to fetch pet ${listing.animalId}:`, err)
+        }
+        return {
+          ...listing,
+          imageUrl: new URL('../img/all_outline.png', import.meta.url).href,
+        }
+      })
+    )
+
+    favorites.value = favoritesWithImages
   } catch (error) {
     console.error('Failed to load favorites:', error)
     favorites.value = []
@@ -666,6 +715,19 @@ async function removeFavorite(listingId: number) {
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Failed to remove favorite'
   }
+}
+
+function getFavoriteListingImage(listing: any): string {
+  return listing.imageUrl || new URL('../img/all_outline.png', import.meta.url).href
+}
+
+function handleFavoriteImageError(e: Event) {
+  const img = e.target as HTMLImageElement
+  img.src = new URL('../img/all_outline.png', import.meta.url).href
+}
+
+function goToListing(listingId: number) {
+  router.push({ name: 'listing-details', params: { id: listingId } })
 }
 
 onMounted(() => {
@@ -884,9 +946,16 @@ onMounted(() => {
   transform: translateY(-4px);
 }
 
-.listing-card.favorite {
-  border-color: #f56565;
-  background: #fff5f5;
+.favorite-listing .listing-description {
+  padding: 0 20px;
+}
+
+.favorite-listing .listing-footer {
+  padding: 12px 20px;
+}
+
+.favorite-listing .btn {
+  margin: 0 20px 20px 20px;
 }
 
 .favorite-badge {
@@ -1156,6 +1225,49 @@ onMounted(() => {
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Favorite Listing Card */
+.favorite-listing {
+  border: none;
+  padding: 0;
+  overflow: hidden;
+}
+
+.favorite-image-wrapper {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #f0f3f8 100%);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.favorite-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.favorite-content {
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.favorite-content .listing-title {
+  flex: 1;
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.favorite-content .badge {
+  flex-shrink: 0;
 }
 
 /* Badges */

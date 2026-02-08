@@ -196,7 +196,7 @@ import type { Listing } from '../types/listing'
 import { fetchListingById, fetchUserName, fetchPetName, fetchListings } from '../api/listings'
 import { getPet } from '../api/profile'
 import { useAuthStore } from '../stores/auth'
-import { addFavorite, removeFavorite } from '../api/favorites'
+import { addFavorite, removeFavorite, getFavoritedListings } from '../api/favorites'
 
 const route = useRoute()
 const router = useRouter()
@@ -213,6 +213,7 @@ const imageBroken = ref(false)
 const copyLinkText = ref('Copy link')
 const relatedListings = ref<Listing[]>([])
 const relatedFavoritedIds = ref<Set<string | number>>(new Set())
+const userFavoritedIds = ref<Set<number>>(new Set())
 
 let abort: AbortController | null = null
 
@@ -342,7 +343,8 @@ async function load() {
 
     relatedListings.value = listingsWithImages
 
-    checkFavorite()
+    // Load user's favorites to check if this listing is favorited
+    await loadUserFavorites()
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     error.value = message
@@ -356,7 +358,39 @@ function checkFavorite() {
     isFavorited.value = false
     return
   }
-  isFavorited.value = false
+
+  // Check if current listing is in user's favorites
+  const listingId = Number(listing.value.listingId)
+  isFavorited.value = userFavoritedIds.value.has(listingId)
+}
+
+async function loadUserFavorites() {
+  if (!auth.isAuthenticated || !auth.user?.userId) {
+    userFavoritedIds.value.clear()
+    relatedFavoritedIds.value.clear()
+    return
+  }
+
+  try {
+    const favorites = await getFavoritedListings(auth.user.userId)
+    userFavoritedIds.value.clear()
+
+    favorites.forEach((fav: any) => {
+      userFavoritedIds.value.add(Number(fav.listingId || fav.id))
+    })
+
+    // Also populate related favorites
+    relatedListings.value.forEach((listing) => {
+      if (userFavoritedIds.value.has(Number(listing.id || listing.listingId))) {
+        relatedFavoritedIds.value.add(listing.id)
+      }
+    })
+
+    checkFavorite()
+  } catch (error) {
+    console.error('Failed to load favorites:', error)
+    userFavoritedIds.value.clear()
+  }
 }
 
 function reload() {

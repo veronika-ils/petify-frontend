@@ -472,7 +472,7 @@ async function deleteReview(reviewId: number) {
 
   if (confirm('Are you sure you want to delete this review?')) {
     try {
-      await deleteReviewAPI(reviewId, auth.user.userId)
+      await deleteReviewAPI( reviewId, auth.user.userId)
       await loadReviews()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to delete review')

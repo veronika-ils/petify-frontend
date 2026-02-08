@@ -50,6 +50,7 @@
                   @click="toggleNearMe"
                   :disabled="geoLoading"
                 >
+                  <img src="@/img/bullseye.png" alt="location" class="btn-icon" />
                   <span v-if="!useNearMe && !geoLoading">Use my location</span>
                   <span v-else-if="geoLoading">Locating…</span>
                   <span v-else>Using my location</span>
@@ -145,7 +146,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import ListingCard from '../components/ListingCard.vue'
+import ListingCard from '@/components/ListingCard.vue'
 import type { Listing } from '../types/listing'
 import { fetchListings } from '../api/listings'
 import { mockListings } from '../data/mockListings'
@@ -576,6 +577,15 @@ watch(petType, () => {
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
 }
 
 .btn-outline-near:hover:not(:disabled) {

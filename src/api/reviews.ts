@@ -60,7 +60,6 @@ export async function getReviewsByOwner(targetUserId: number): Promise<Review[]>
 
   return await response.json()
 }
-
 export async function deleteReview(reviewId: number, userId: number): Promise<void> {
   const url = joinUrl(getBaseUrl(), `/api/reviews/${reviewId}`)
   const response = await fetch(url, {
