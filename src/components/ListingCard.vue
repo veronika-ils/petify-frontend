@@ -134,8 +134,8 @@ const chips = computed(() => {
 
     // When the backend returns minimal listing data, still show something useful.
     if (!out.length) {
-        if (props.listing?.animalId !== undefined) out.push(`Animal #${props.listing.animalId}`);
-        if (props.listing?.ownerId !== undefined) out.push(`Owner #${props.listing.ownerId}`);
+        if (props.listing?.animalName) out.push(props.listing.animalName);
+        if (props.listing?.ownerName) out.push(`By ${props.listing.ownerName}`);
         if (props.listing?.status) out.push(String(props.listing.status));
     }
     return out.filter(Boolean);

@@ -152,7 +152,7 @@ import { fetchListings } from '../api/listings'
 import { mockListings } from '../data/mockListings'
 import { useAuthStore } from '../stores/auth'
 import { addFavorite, removeFavorite, getFavoritedListings } from '../api/favorites'
-import { getPet } from '../api/profile'
+import { getPet, getUserProfile } from '../api/profile'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -184,6 +184,9 @@ const petTypes = [
 
 // Store pet details cache to avoid repeated API calls
 const petDetailsCache = ref<Map<number, any>>(new Map())
+
+// Store owner details cache
+const ownerDetailsCache = ref<Map<number, any>>(new Map())
 
 const breedOptions = computed(() => {
   const set = new Set<string>()
@@ -318,27 +321,38 @@ async function load() {
   try {
     const data = await fetchListings({ signal: abort.signal })
 
-    // Fetch pet images and details for each listing
+    // Fetch pet images and owner details for each listing
     const listingsWithImages = await Promise.all(
       data.map(async (listing) => {
+        const result = { ...listing }
+
+        // Fetch pet details
         try {
           if (listing.animalId) {
             const pet = await getPet(listing.animalId)
             // Cache pet details for breed options
             petDetailsCache.value.set(listing.animalId, pet)
-            return {
-              ...listing,
-              imageUrl: pet.photoUrl || new URL('../img/all_outline.png', import.meta.url).href,
-            }
+            result.imageUrl = pet.photoUrl || new URL('../img/all_outline.png', import.meta.url).href
+            result.animalName = pet.name // Add pet name
           }
         } catch (err) {
-          // If pet fetch fails, just continue without image
           console.error(`Failed to fetch pet ${listing.animalId}:`, err)
+          result.imageUrl = new URL('../img/all_outline.png', import.meta.url).href
         }
-        return {
-          ...listing,
-          imageUrl: new URL('../img/all_outline.png', import.meta.url).href,
+
+        // Fetch owner details
+        try {
+          if (listing.ownerId) {
+            const owner = await getUserProfile(listing.ownerId)
+            // Cache owner details
+            ownerDetailsCache.value.set(listing.ownerId, owner)
+            result.ownerName = `${owner.firstName} ${owner.lastName}` // Add owner name
+          }
+        } catch (err) {
+          console.error(`Failed to fetch owner ${listing.ownerId}:`, err)
         }
+
+        return result
       })
     )
 
