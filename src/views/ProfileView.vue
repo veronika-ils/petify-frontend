@@ -120,9 +120,10 @@
                       @change="updateStatus(listing)"
                       class="form-select form-select-sm"
                     >
+                      <option value="DRAFT">Draft</option>
                       <option value="ACTIVE">Active</option>
-                      <option value="INACTIVE">Inactive</option>
                       <option value="SOLD">Sold</option>
+                      <option value="ARCHIVED">Archived</option>
                     </select>
                     <button
                       @click="deleteListing_(listing.listingId)"
@@ -581,7 +582,10 @@ async function submitListing() {
 }
 
 async function updateStatus(listing: any) {
-  if (!auth.user?.userId) return
+
+  if (!auth.user?.userId) {
+    return
+  }
 
   try {
     await updateListingStatus(auth.user.userId, listing.listingId, listing.status)
