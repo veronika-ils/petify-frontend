@@ -88,6 +88,17 @@
                 <i class="bi bi-plus-circle-fill"></i> Create Listing
               </button>
             </li>
+            <li v-if="isAdmin" class="nav-item" role="presentation">
+              <button
+                class="nav-link"
+                :class="{ active: activeTab === 'admin' }"
+                @click="activeTab = 'admin'"
+                type="button"
+                role="tab"
+              >
+                <i class="bi bi-shield-lock-fill"></i> Admin Panel
+              </button>
+            </li>
           </ul>
 
           <!-- Listings Tab -->
@@ -421,6 +432,105 @@
               </div>
             </div>
           </div>
+
+          <!-- Admin Panel Tab -->
+          <div v-if="activeTab === 'admin' && isAdmin" class="tab-content-section">
+            <h2 class="section-title">Admin Panel</h2>
+            <div class="admin-panel">
+              <div class="admin-section">
+                <h3 class="admin-subtitle">System Statistics</h3>
+                <div class="stats-grid">
+                  <div class="stat-card">
+                    <div class="stat-value">{{ adminStats.totalUsers }}</div>
+                    <div class="stat-label">Total Users</div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-value">{{ adminStats.totalListings }}</div>
+                    <div class="stat-label">Total Listings</div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-value">{{ adminStats.activeListing }}</div>
+                    <div class="stat-label">Active Listings</div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-value">{{ adminStats.soldListings }}</div>
+                    <div class="stat-label">Sold Listings</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="admin-section">
+                <h3 class="admin-subtitle">Users Management</h3>
+                <div v-if="adminUsers.length === 0" class="empty-state">
+                  <p class="empty-text">No users found</p>
+                </div>
+                <div v-else class="admin-table-container">
+                  <table class="admin-table">
+                    <thead>
+                      <tr>
+                        <th>User ID</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="user in adminUsers" :key="user.userId">
+                        <td>{{ user.userId }}</td>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>
+                          <span class="badge" :class="getUserTypeBadgeClass(user.userType)">
+                            {{ user.userType }}
+                          </span>
+                        </td>
+                        <td>
+                          <span v-if="!user.isBlocked" class="badge bg-success">Active</span>
+                          <span v-else class="badge bg-danger">Blocked</span>
+                        </td>
+                        <td>{{ formatDate(user.createdAt) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="admin-section">
+                <h3 class="admin-subtitle">Listings Management</h3>
+                <div v-if="adminListings.length === 0" class="empty-state">
+                  <p class="empty-text">No listings found</p>
+                </div>
+                <div v-else class="admin-table-container">
+                  <table class="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Listing ID</th>
+                        <th>Owner</th>
+                        <th>Status</th>
+                        <th>Price</th>
+                        <th>Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="listing in adminListings" :key="listing.listingId">
+                        <td>{{ listing.listingId }}</td>
+                        <td>{{ listing.ownerName || 'N/A' }}</td>
+                        <td>
+                          <span class="badge" :class="getStatusBadgeClass(listing.status)">
+                            {{ listing.status }}
+                          </span>
+                        </td>
+                        <td>${{ listing.price?.toFixed(2) || '0.00' }}</td>
+                        <td>{{ formatDate(listing.createdAt) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -428,7 +538,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import {
@@ -445,14 +555,23 @@ import { getFavoritedListings, removeFavorite as removeFavoriteAPI } from '../ap
 const router = useRouter()
 const auth = useAuthStore()
 
-const activeTab = ref<'listings' | 'pets' | 'add-pet' | 'create-listing' | 'favorites'>('listings')
+const activeTab = ref<'listings' | 'pets' | 'add-pet' | 'create-listing' | 'favorites' | 'admin'>('listings')
 const listings = ref<any[]>([])
 const pets = ref<any[]>([])
 const favorites = ref<any[]>([])
+const adminUsers = ref<any[]>([])
+const adminListings = ref<any[]>([])
 const isLoading = ref(false)
 const isSubmitting = ref(false)
 const isPetSubmitting = ref(false)
 const errorMessage = ref('')
+
+const adminStats = ref({
+  totalUsers: 0,
+  totalListings: 0,
+  activeListing: 0,
+  soldListings: 0,
+})
 
 const newListing = ref({
   animalId: null as number | null,
@@ -473,6 +592,10 @@ const newPet = ref({
 
 const isOwner = computed(() => {
   return auth.user?.userType === 'OWNER'
+})
+
+const isAdmin = computed(() => {
+  return auth.user?.userType === 'ADMIN'
 })
 
 const userType = computed(() => {
@@ -525,6 +648,19 @@ function getStatusBadgeClass(status: string): string {
       return 'bg-danger'
     default:
       return 'bg-warning'
+  }
+}
+
+function getUserTypeBadgeClass(userType: string): string {
+  switch (userType) {
+    case 'ADMIN':
+      return 'bg-danger'
+    case 'OWNER':
+      return 'bg-primary'
+    case 'CLIENT':
+      return 'bg-info'
+    default:
+      return 'bg-secondary'
   }
 }
 
@@ -734,6 +870,31 @@ function goToListing(listingId: number) {
   router.push({ name: 'listing-details', params: { id: listingId } })
 }
 
+async function loadAdminData() {
+  if (!isAdmin.value) return
+
+  try {
+    isLoading.value = true
+    console.log('📊 Loading admin data...')
+
+    // Placeholder data - in a real app, you'd fetch this from an API endpoint
+    // For now, we'll load from existing data
+    adminListings.value = listings.value
+
+    // Calculate statistics
+    adminStats.value.totalListings = listings.value.length
+    adminStats.value.activeListing = listings.value.filter((l) => l.status === 'ACTIVE').length
+    adminStats.value.soldListings = listings.value.filter((l) => l.status === 'SOLD').length
+
+    console.log('✅ Admin data loaded successfully')
+  } catch (error) {
+    console.error('❌ Failed to load admin data:', error)
+    errorMessage.value = 'Failed to load admin data'
+  } finally {
+    isLoading.value = false
+  }
+}
+
 onMounted(() => {
   if (!auth.isAuthenticated) {
     router.push('/login')
@@ -743,6 +904,17 @@ onMounted(() => {
   loadListings()
   loadPets()
   loadFavorites()
+
+  if (isAdmin.value) {
+    loadAdminData()
+  }
+})
+
+// Watch activeTab to load admin data when switching to admin tab
+watch(activeTab, (newTab) => {
+  if (newTab === 'admin' && isAdmin.value) {
+    loadAdminData()
+  }
 })
 </script>
 
@@ -1386,6 +1558,137 @@ onMounted(() => {
 
   .form-actions .btn {
     width: 100%;
+  }
+}
+
+/* Admin Panel Styles */
+.admin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.admin-section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+}
+
+.admin-subtitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  color: white;
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+}
+
+.stat-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.admin-table-container {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.admin-table thead {
+  background: #f7fafc;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.admin-table thead th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.admin-table tbody td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #4a5568;
+}
+
+.admin-table tbody tr:hover {
+  background: #f7fafc;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.bg-success {
+  background-color: #c6f6d5;
+  color: #22543d;
+}
+
+.bg-danger {
+  background-color: #fed7d7;
+  color: #742a2a;
+}
+
+.bg-primary {
+  background-color: #bee3f8;
+  color: #2c5282;
+}
+
+.bg-info {
+  background-color: #b2e0d8;
+  color: #234e52;
+}
+
+.bg-secondary {
+  background-color: #cbd5e0;
+  color: #2d3748;
+}
+
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-table {
+    font-size: 0.85rem;
+  }
+
+  .admin-table thead th,
+  .admin-table tbody td {
+    padding: 8px 12px;
   }
 }
 </style>
