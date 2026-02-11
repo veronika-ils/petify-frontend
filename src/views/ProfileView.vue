@@ -551,6 +551,7 @@ import {
   getPet,
 } from '../api/profile'
 import { getFavoritedListings, removeFavorite as removeFavoriteAPI } from '../api/favorites'
+import { getAllUsers, getAllListings } from '../api/admin'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -871,25 +872,35 @@ function goToListing(listingId: number) {
 }
 
 async function loadAdminData() {
-  if (!isAdmin.value) return
+  if (!isAdmin.value || !auth.user?.userId) return
 
   try {
     isLoading.value = true
     console.log('📊 Loading admin data...')
 
-    // Placeholder data - in a real app, you'd fetch this from an API endpoint
-    // For now, we'll load from existing data
-    adminListings.value = listings.value
+    // Fetch all users from backend
+    console.log('👥 Fetching all users...')
+    const users = await getAllUsers(auth.user.userId)
+    adminUsers.value = Array.isArray(users) ? users : []
+    console.log(`✅ Loaded ${adminUsers.value.length} users`)
 
-    // Calculate statistics
-    adminStats.value.totalListings = listings.value.length
-    adminStats.value.activeListing = listings.value.filter((l) => l.status === 'ACTIVE').length
-    adminStats.value.soldListings = listings.value.filter((l) => l.status === 'SOLD').length
+    // Fetch all listings from backend
+    console.log('📋 Fetching all listings...')
+    const allListings = await getAllListings(auth.user.userId)
+    adminListings.value = Array.isArray(allListings) ? allListings : []
+    console.log(`✅ Loaded ${adminListings.value.length} listings`)
+
+    // Calculate statistics from all listings
+    adminStats.value.totalUsers = adminUsers.value.length
+    adminStats.value.totalListings = adminListings.value.length
+    adminStats.value.activeListing = adminListings.value.filter((l: any) => l.status === 'ACTIVE').length
+    adminStats.value.soldListings = adminListings.value.filter((l: any) => l.status === 'SOLD').length
 
     console.log('✅ Admin data loaded successfully')
+    console.log('📊 Stats:', adminStats.value)
   } catch (error) {
     console.error('❌ Failed to load admin data:', error)
-    errorMessage.value = 'Failed to load admin data'
+    errorMessage.value = 'Failed to load admin data. Make sure you have admin privileges.'
   } finally {
     isLoading.value = false
   }
