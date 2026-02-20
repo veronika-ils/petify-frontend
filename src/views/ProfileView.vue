@@ -14,7 +14,10 @@
         <div class="profile-card">
           <div class="profile-content">
             <div class="profile-info">
-              <h1 class="profile-name">{{ auth.user?.firstName }} {{ auth.user?.lastName }}</h1>
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <h1 class="profile-name">{{ auth.user?.firstName }} {{ auth.user?.lastName }}</h1>
+                <span v-if="auth.user?.verified" class="verified-badge">✓ Verified</span>
+              </div>
               <p class="profile-username">@{{ auth.user?.username }}</p>
               <p class="profile-email">
                 <i class="bi bi-envelope"></i> {{ auth.user?.email }}
@@ -549,6 +552,7 @@ import {
   deleteListing,
   updateListingStatus,
   getPet,
+  loadUserVerificationStatus,
 } from '../api/profile'
 import { getFavoritedListings, removeFavorite as removeFavoriteAPI } from '../api/favorites'
 import { getAllUsers, getAllListings } from '../api/admin'
@@ -906,6 +910,20 @@ async function loadAdminData() {
   }
 }
 
+async function loadUserVerification() {
+  if (!auth.user?.userId) return
+
+  try {
+    const isVerified = await loadUserVerificationStatus(auth.user.userId)
+    if (auth.user) {
+      auth.user.verified = isVerified
+    }
+    console.log(`✅ User verification status loaded: ${isVerified}`)
+  } catch (error) {
+    console.error('Failed to load user verification status:', error)
+  }
+}
+
 onMounted(() => {
   if (!auth.isAuthenticated) {
     router.push('/login')
@@ -915,6 +933,7 @@ onMounted(() => {
   loadListings()
   loadPets()
   loadFavorites()
+  loadUserVerification()
 
   if (isAdmin.value) {
     loadAdminData()
@@ -995,6 +1014,16 @@ watch(activeTab, (newTab) => {
   font-size: 0.95rem;
   padding: 8px 16px;
   border-radius: 8px;
+}
+
+.verified-badge {
+  background: #10b981;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
   font-weight: 600;
   letter-spacing: 0.5px;
 }

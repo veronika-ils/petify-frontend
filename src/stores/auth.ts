@@ -12,6 +12,7 @@ interface User {
   firstName: string
   lastName: string
   userType: string
+  verified: boolean
 }
 
 export const useAuthStore = defineStore('auth', () => {

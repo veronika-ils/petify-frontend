@@ -31,7 +31,10 @@
           <div class="profile-card">
             <div class="profile-content">
               <div class="profile-info">
-                <h1 class="profile-name">{{ ownerInfo.firstName }} {{ ownerInfo.lastName }}</h1>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <h1 class="profile-name">{{ ownerInfo.firstName }} {{ ownerInfo.lastName }}</h1>
+                  <span v-if="ownerInfo.verified" class="verified-badge">✓ Verified</span>
+                </div>
                 <p class="profile-username">@{{ ownerInfo.username }}</p>
                 <p class="profile-email">
                   <i class="bi bi-envelope"></i>
@@ -280,7 +283,7 @@
 import starImg from '@/img/star.png'
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
-import { getUserProfile, getUserListings, getUserPets } from '../api/profile'
+import { getUserProfile, getUserListings, getUserPets, loadUserVerificationStatus } from '../api/profile'
 import { createReview, getReviewsByOwner, deleteReview as deleteReviewAPI } from '../api/reviews'
 import { useAuthStore } from '../stores/auth'
 
@@ -356,6 +359,9 @@ async function load() {
     ownerListings.value = extractArray(listingsRes)
     ownerPets.value = extractArray(petsRes)
     ownerReviews.value = extractArray(reviewsRes)
+
+    // Load verification status
+    await loadOwnerVerification()
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     error.value = message
@@ -461,6 +467,20 @@ async function loadReviews() {
     ownerReviews.value = extractArray(res)
   } catch (err) {
     console.error('Failed to load reviews:', err)
+  }
+}
+
+async function loadOwnerVerification() {
+  if (!ownerInfo.value?.userId) return
+
+  try {
+    const isVerified = await loadUserVerificationStatus(ownerInfo.value.userId)
+    if (ownerInfo.value) {
+      ownerInfo.value.verified = isVerified
+    }
+    console.log(`✅ Owner verification status loaded: ${isVerified}`)
+  } catch (error) {
+    console.error('Failed to load owner verification status:', error)
   }
 }
 
@@ -577,6 +597,16 @@ onBeforeUnmount(() => abort?.abort())
 .profile-badge {
   display: flex;
   align-items: center;
+}
+
+.verified-badge {
+  background: #10b981;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /* Main Content */

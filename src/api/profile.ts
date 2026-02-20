@@ -204,3 +204,24 @@ export async function getPet(petId: number): Promise<Pet> {
   return await response.json()
 }
 
+export async function loadUserVerificationStatus(userId: number): Promise<boolean> {
+  try {
+    const url = joinUrl(getBaseUrl(), `/api/users/${userId}/verified`)
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      return false
+    }
+
+    const data = await response.json()
+    return data.verified || false
+  } catch (error) {
+    console.error('Failed to load user verification status:', error)
+    return false
+  }
+}

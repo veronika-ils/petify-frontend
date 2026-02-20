@@ -20,6 +20,7 @@ export interface AuthResult {
     firstName: string
     lastName: string
     userType: string
+    verified: boolean
   }
   message?: string
 }
@@ -101,7 +102,8 @@ export async function login(payload: LoginRequest, options?: { signal?: AbortSig
         email: data.email,
         firstName: data.firstName,
         lastName: data.lastName,
-        userType: data.userType
+        userType: data.userType,
+        verified: false // Will be updated by ProfileView
       },
       message: data.message
     }
@@ -128,7 +130,8 @@ export async function signup(payload: SignupRequest, options?: { signal?: AbortS
         email: data.email,
         firstName: data.firstName,
         lastName: data.lastName,
-        userType: data.userType
+        userType: data.userType,
+        verified: false // Will be updated by ProfileView
       },
       message: data.message
     }
