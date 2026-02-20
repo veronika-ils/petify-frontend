@@ -103,8 +103,25 @@
       <div class="container">
         <div class="listings-header">
           <div>
-            <h2 class="listings-title">Browse all listings</h2>
-            <p class="listings-subtitle">Scroll to see available pets</p>
+            <div class="view-mode-tabs mb-3">
+              <button
+                :class="['view-mode-btn', { active: viewMode === 'all' }]"
+                @click="viewMode = 'all'; load()"
+                type="button"
+              >
+                All Listings
+              </button>
+              <button
+                v-if="auth.isAuthenticated"
+                :class="['view-mode-btn', { active: viewMode === 'recommended' }]"
+                @click="viewMode = 'recommended'; load()"
+                type="button"
+              >
+                Recommended
+              </button>
+            </div>
+            <h2 class="listings-title">{{ viewMode === 'recommended' ? 'Your recommended listings' : 'Browse all listings' }}</h2>
+            <p class="listings-subtitle">{{ viewMode === 'recommended' ? 'Personalized just for you' : 'Scroll to see available pets' }}</p>
           </div>
           <button class="btn btn-outline-secondary" type="button" @click="reload" :disabled="loading">
             {{ loading ? 'Loading…' : 'Reload' }}
@@ -148,7 +165,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import ListingCard from '@/components/ListingCard.vue'
 import type { Listing } from '../types/listing'
-import { fetchListings } from '../api/listings'
+import { fetchListings, fetchRecommendedListings } from '../api/listings'
 import { mockListings } from '../data/mockListings'
 import { useAuthStore } from '../stores/auth'
 import { addFavorite, removeFavorite, getFavoritedListings } from '../api/favorites'
@@ -162,6 +179,7 @@ const error = ref<string | null>(null)
 const listings = ref<Listing[]>([])
 const favoritedListingIds = ref<Set<number>>(new Set())
 
+const viewMode = ref<'all' | 'recommended'>('all')
 const petType = ref('')
 
 // Filters
@@ -319,7 +337,15 @@ async function load() {
   abort = new AbortController()
 
   try {
-    const data = await fetchListings({ signal: abort.signal })
+    let data: Listing[]
+
+    if (viewMode.value === 'recommended' && auth.isAuthenticated && auth.user?.userId) {
+      // Load recommended listings
+      data = await fetchRecommendedListings(auth.user.userId, { signal: abort.signal })
+    } else {
+      // Load all listings
+      data = await fetchListings({ signal: abort.signal })
+    }
 
     // Fetch pet images and owner details for each listing
     const listingsWithImages = await Promise.all(
@@ -688,6 +714,34 @@ watch(petType, () => {
   margin: 8px 0 0;
   color: #6b7280;
   font-size: 1rem;
+}
+
+.view-mode-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.view-mode-btn {
+  padding: 8px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  color: #6b7280;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-mode-btn:hover {
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.view-mode-btn.active {
+  border-color: #f97316;
+  background: #f97316;
+  color: white;
 }
 
 /* Grid */

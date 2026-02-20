@@ -178,3 +178,22 @@ export async function fetchPetName(petId: number, options?: { signal?: AbortSign
   }
 }
 
+export async function fetchRecommendedListings(userId: number, options?: { signal?: AbortSignal }): Promise<Listing[]> {
+  const url = joinUrl(getBaseUrl(), '/api/listings/recommendations')
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      'X-User-Id': String(userId)
+    },
+    signal: options?.signal,
+  })
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch recommended listings: ${res.statusText}`)
+  }
+
+  const data = (await res.json()) as unknown
+  if (!Array.isArray(data)) return []
+  return data.map(normalizeListingRow).filter((item) => item !== null) as Listing[]
+}
