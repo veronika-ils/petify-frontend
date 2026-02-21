@@ -25,6 +25,11 @@
         <div class="d-flex align-items-center gap-2 ms-auto">
           <div class="d-flex gap-2">
             <template v-if="auth.isAuthenticated">
+              <template v-if="auth.user?.userType === 'ADMIN'">
+                <RouterLink class="btn btn-admin" to="/admin/reviews">
+                  <i class="bi bi-eye"></i> Reviews
+                </RouterLink>
+              </template>
               <RouterLink class="btn btn-outline-secondary" to="/profile">
                 {{ auth.user?.firstName }}'s Profile
               </RouterLink>
@@ -123,5 +128,31 @@ function logout() {
 .btn-signup:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 22px rgba(249, 115, 22, 0.45);
+}
+
+/* Admin button */
+.btn-admin {
+  border-radius: 12px;
+  padding: 0.45rem 1rem;
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  border: none;
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.35);
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-admin:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(220, 38, 38, 0.45);
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.btn-admin i {
+  font-size: 0.9rem;
 }
 </style>
