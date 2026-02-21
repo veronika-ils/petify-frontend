@@ -485,8 +485,8 @@
                         <td>{{ user.username }}</td>
                         <td>{{ user.email }}</td>
                         <td>
-                          <span class="badge" :class="getUserTypeBadgeClass(user.userType)">
-                            {{ user.userType }}
+                          <span class="badge" :class="getUserTypeBadgeClass(user.userType || 'CLIENT')">
+                            {{ user.userType || 'CLIENT' }}
                           </span>
                         </td>
                         <td>
@@ -519,7 +519,12 @@
                     <tbody>
                       <tr v-for="listing in adminListings" :key="listing.listingId">
                         <td>{{ listing.listingId }}</td>
-                        <td>{{ listing.ownerName || 'N/A' }}</td>
+                        <td>
+                          <div class="owner-info">
+                            <div class="owner-name">{{ listing.ownerName || 'N/A' }}</div>
+                            <div class="owner-username">@{{ listing.ownerUsername || 'unknown' }}</div>
+                          </div>
+                        </td>
                         <td>
                           <span class="badge" :class="getStatusBadgeClass(listing.status)">
                             {{ listing.status }}
@@ -885,8 +890,13 @@ async function loadAdminData() {
     // Fetch all users from backend
     console.log('👥 Fetching all users...')
     const users = await getAllUsers(auth.user.userId)
-    adminUsers.value = Array.isArray(users) ? users : []
+    console.log('📋 Raw users response:', users)
+    adminUsers.value = Array.isArray(users) ? users.map((user: any) => ({
+      ...user,
+      userType: user.userType || 'CLIENT'
+    })) : []
     console.log(`✅ Loaded ${adminUsers.value.length} users`)
+    console.log('👥 Processed users:', adminUsers.value)
 
     // Fetch all listings from backend
     console.log('📋 Fetching all listings...')
@@ -1681,6 +1691,22 @@ watch(activeTab, (newTab) => {
 
 .admin-table tbody tr:hover {
   background: #f7fafc;
+}
+
+.owner-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.owner-name {
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.owner-username {
+  font-size: 0.85rem;
+  color: #718096;
 }
 
 .badge {
