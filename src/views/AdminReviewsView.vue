@@ -48,6 +48,15 @@
                   <h4 class="user-name">{{ user.firstName }} {{ user.lastName }}</h4>
                   <p class="user-username">@{{ user.username }}</p>
                   <p class="user-email">{{ user.email }}</p>
+                  <div class="user-stats">
+                    <span class="stat-item">
+                      <i class="bi bi-chat-dots"></i> {{ getUserReviewCount(user.userId) }} reviews
+                    </span>
+                    <span class="stat-item">
+                      <img src="@/img/star.png" alt="star" class="stat-star" />
+                      {{ getUserAverageRating(user.userId).toFixed(1) }}
+                    </span>
+                  </div>
                 </div>
                 <div class="user-type-badge">
                   <span class="badge" :class="getUserTypeBadgeClass(user.userType)">
@@ -67,8 +76,27 @@
 
             <div v-else>
               <div class="panel-header">
-                <h2 class="panel-title">Reviews for {{ selectedUser.firstName }} {{ selectedUser.lastName }}</h2>
+                <div class="header-top">
+                  <h2 class="panel-title">Reviews for {{ selectedUser.firstName }} {{ selectedUser.lastName }}</h2>
+                  <button
+                    v-if="!selectedUser.isBlocked"
+                    @click="openBlockModal(selectedUser)"
+                    class="btn btn-danger-sm"
+                  >
+                    <i class="bi bi-ban"></i> Block User
+                  </button>
+                  <button
+                    v-else
+                    @click="unblockUser(selectedUser.userId)"
+                    class="btn btn-success-sm"
+                  >
+                    <i class="bi bi-check-circle"></i> Unblock User
+                  </button>
+                </div>
                 <p class="user-meta">@{{ selectedUser.username }} • {{ selectedUser.userType }}</p>
+                <p v-if="selectedUser.isBlocked" class="blocked-info">
+                  🔒 This user is blocked: {{ selectedUser.blockedReason }}
+                </p>
               </div>
 
               <div v-if="isLoadingReviews" class="loading-state">
@@ -112,6 +140,46 @@
         </div>
       </div>
     </div>
+
+    <!-- Block User Modal -->
+    <div v-if="showBlockModal" class="modal-overlay" @click.self="closeBlockModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Block User</h3>
+          <button @click="closeBlockModal" class="close-btn">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <p class="modal-text">
+            Are you sure you want to block <strong>{{ userToBlock?.firstName }} {{ userToBlock?.lastName }}</strong>?
+          </p>
+          <p class="modal-subtext">
+            They will not be able to log in until they are unblocked.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label">Reason for blocking:</label>
+            <textarea
+              v-model="blockReason"
+              placeholder="Enter the reason for blocking this user (optional)"
+              class="form-control"
+              rows="4"
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button @click="closeBlockModal" class="btn btn-outline-secondary">
+            Cancel
+          </button>
+          <button @click="confirmBlockUser" class="btn btn-danger">
+            <i class="bi bi-ban"></i> Block User
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -127,10 +195,14 @@ const auth = useAuthStore()
 
 const users = ref<any[]>([])
 const userReviews = ref<any[]>([])
+const userReviewStats = ref<Map<number, { count: number; avgRating: number }>>(new Map())
 const selectedUserId = ref<number | null>(null)
 const searchQuery = ref('')
 const isLoading = ref(false)
 const isLoadingReviews = ref(false)
+const showBlockModal = ref(false)
+const userToBlock = ref<any | null>(null)
+const blockReason = ref('')
 
 // Filter to show only non-admin users
 const filteredUsers = computed(() => {
@@ -173,6 +245,16 @@ function getUserTypeBadgeClass(userType: string): string {
   }
 }
 
+function getUserReviewCount(userId: number): number {
+  const stats = userReviewStats.value.get(userId)
+  return stats ? stats.count : 0
+}
+
+function getUserAverageRating(userId: number): number {
+  const stats = userReviewStats.value.get(userId)
+  return stats ? stats.avgRating : 0
+}
+
 async function loadUsers() {
   if (!auth.user?.userId) return
 
@@ -181,6 +263,9 @@ async function loadUsers() {
     const allUsers = await getAllUsers(auth.user.userId)
     // Filter out admins
     users.value = allUsers.filter((user: any) => user.userType !== 'ADMIN')
+
+    // Load reviews for all users to calculate stats
+    await loadAllUserReviewStats()
   } catch (error) {
     console.error('Failed to load users:', error)
   } finally {
@@ -188,8 +273,41 @@ async function loadUsers() {
   }
 }
 
+async function loadAllUserReviewStats() {
+  try {
+    // For each user, fetch their reviews and calculate stats
+    for (const user of users.value) {
+      try {
+        const reviews = await getReviewsByOwner(user.userId)
+
+        if (reviews && reviews.length > 0) {
+          const avgRating = reviews.reduce((sum: number, review: any) => sum + (Number(review.rating) || 0), 0) / reviews.length
+          userReviewStats.value.set(user.userId, {
+            count: reviews.length,
+            avgRating: avgRating,
+          })
+        } else {
+          userReviewStats.value.set(user.userId, {
+            count: 0,
+            avgRating: 0,
+          })
+        }
+      } catch (error) {
+        console.error(`Failed to load reviews for user ${user.userId}:`, error)
+        userReviewStats.value.set(user.userId, {
+          count: 0,
+          avgRating: 0,
+        })
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load review stats:', error)
+  }
+}
+
 async function selectUser(user: any) {
   selectedUserId.value = user.userId
+
   await loadUserReviews(user.userId)
 }
 
@@ -203,6 +321,61 @@ async function loadUserReviews(userId: number) {
     userReviews.value = []
   } finally {
     isLoadingReviews.value = false
+  }
+}
+
+function openBlockModal(user: any) {
+  userToBlock.value = user
+  blockReason.value = ''
+  showBlockModal.value = true
+}
+
+function closeBlockModal() {
+  showBlockModal.value = false
+  userToBlock.value = null
+  blockReason.value = ''
+}
+
+async function confirmBlockUser() {
+  if (!userToBlock.value || !auth.user?.userId) return
+
+  try {
+    // Import the blockUser function from admin API
+    const { blockUser } = await import('../api/admin')
+    await blockUser(auth.user.userId, userToBlock.value.userId, true, blockReason.value)
+
+    // Update user blocked status
+    const blockedUser = users.value.find(u => u.userId === userToBlock.value.userId)
+    if (blockedUser) {
+      blockedUser.isBlocked = true
+      blockedUser.blockedReason = blockReason.value
+    }
+
+    closeBlockModal()
+  } catch (error) {
+    console.error('Failed to block user:', error)
+    alert('Failed to block user')
+  }
+}
+
+async function unblockUser(userId: number) {
+  if (!auth.user?.userId) return
+
+  if (!confirm('Are you sure you want to unblock this user?')) return
+
+  try {
+    const { blockUser } = await import('../api/admin')
+    await blockUser(auth.user.userId, userId, false, '')
+
+    // Update user blocked status
+    const unblockedUser = users.value.find(u => u.userId === userId)
+    if (unblockedUser) {
+      unblockedUser.isBlocked = false
+      unblockedUser.blockedReason = ''
+    }
+  } catch (error) {
+    console.error('Failed to unblock user:', error)
+    alert('Failed to unblock user')
   }
 }
 
@@ -366,6 +539,34 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.user-stats {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.stat-item i {
+  font-size: 0.85rem;
+  color: #f97316;
+}
+
+.stat-star {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
 }
 
 .user-type-badge {
@@ -536,6 +737,215 @@ onMounted(() => {
 .bg-secondary {
   background: #cbd5e0;
   color: #2d3748;
+}
+
+/* Header Top Layout */
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Action Buttons */
+.btn-danger-sm,
+.btn-success-sm {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-danger-sm {
+  background: #dc2626;
+  color: white;
+}
+
+.btn-danger-sm:hover {
+  background: #b91c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+.btn-success-sm {
+  background: #16a34a;
+  color: white;
+}
+
+.btn-success-sm:hover {
+  background: #15803d;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+}
+
+.blocked-info {
+  color: #dc2626;
+  background: #fee2e2;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  margin: 8px 0 0 0;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 90%;
+  overflow: hidden;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f7fafc;
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #718096;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.close-btn:hover {
+  color: #2d3748;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-text {
+  font-size: 1rem;
+  color: #2d3748;
+  margin: 0 0 8px 0;
+}
+
+.modal-subtext {
+  font-size: 0.9rem;
+  color: #718096;
+  margin: 0 0 20px 0;
+}
+
+.form-group {
+  margin-bottom: 0;
+}
+
+.form-label {
+  display: block;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.form-control {
+  width: 100%;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+  transition: all 0.2s ease;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid #e2e8f0;
+  background: #f7fafc;
+}
+
+.btn {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  font-size: 0.9rem;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+.btn-outline-secondary {
+  border: 1.5px solid #cbd5e0;
+  color: #4a5568;
+  background: white;
+}
+
+.btn-outline-secondary:hover {
+  background: #f7fafc;
+  border-color: #2d3748;
 }
 
 /* Responsive */

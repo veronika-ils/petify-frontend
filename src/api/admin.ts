@@ -42,7 +42,7 @@ export async function getAllListings(userId: number): Promise<any[]> {
   return await response.json()
 }
 
-export async function blockUser(userId: number, targetUserId: number, isBlocked: boolean): Promise<void> {
+export async function blockUser(userId: number, targetUserId: number, isBlocked: boolean, reason?: string): Promise<void> {
   const url = joinUrl(getBaseUrl(), `/api/users/admin/${targetUserId}/block`)
   const response = await fetch(url, {
     method: 'PATCH',
@@ -50,7 +50,7 @@ export async function blockUser(userId: number, targetUserId: number, isBlocked:
       'Content-Type': 'application/json',
       'X-User-Id': String(userId),
     },
-    body: JSON.stringify({ isBlocked }),
+    body: JSON.stringify({ isBlocked, blockedReason: reason || '' }),
   })
 
   if (!response.ok) {
